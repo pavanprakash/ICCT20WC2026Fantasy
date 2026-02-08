@@ -1,14 +1,30 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../api.js";
 import fixtures from "../data/fixtures-2026.js";
+import SelectedTeamField from "../components/SelectedTeamField.jsx";
 
 const BUDGET = 100;
 const TEAM_SIZE = 11;
 const MAX_PER_TEAM = 7;
+const ROLE_LIMITS = {
+  bat: 5,
+  bowl: 5,
+  wk: 4,
+  ar: 4
+};
+const MATCH_DURATION_MS = 4 * 60 * 60 * 1000;
+const SYNC_WINDOW_MS = 10 * 60 * 1000;
 const formatPrice = (value) => Number(value || 0).toFixed(1);
 const todayUtc = () => {
   const now = new Date();
   return now.toISOString().slice(0, 10);
+};
+
+const nextFixtureDateUtc = () => {
+  const today = todayUtc();
+  const dates = fixtures.map((f) => f.date);
+  const unique = Array.from(new Set(dates)).filter((d) => d > today).sort();
+  return unique[0] || today;
 };
 
 const roundKey = todayUtc;
@@ -18,8 +34,15 @@ export default function TeamBuilder() {
   const [selected, setSelected] = useState([]);
   const [teamName, setTeamName] = useState("My XI");
   const [status, setStatus] = useState(null);
+  const [captainId, setCaptainId] = useState("");
+  const [viceCaptainId, setViceCaptainId] = useState("");
+  const [isEditing, setIsEditing] = useState(true);
+  const [savedTeam, setSavedTeam] = useState({ players: [], captainId: "", viceCaptainId: "" });
+  const [editSecondsLeft, setEditSecondsLeft] = useState(0);
   const [query, setQuery] = useState("");
   const [teamFilter, setTeamFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [priceRange, setPriceRange] = useState("all");
   const [fixtureDay, setFixtureDay] = useState([]);
   const [fixtureStatus, setFixtureStatus] = useState("loading");
   const [teamMeta, setTeamMeta] = useState(null);
@@ -27,33 +50,59 @@ export default function TeamBuilder() {
   const [lockMeta, setLockMeta] = useState({ firstStart: null, lockUntil: null });
   const [dailyPoints, setDailyPoints] = useState({ total: 0, matches: 0, loading: true });
 
+  const refreshPlayers = async (shouldApply = () => true) => {
+    const res = await api.get("/players");
+    if (!shouldApply()) return;
+    setPlayers(res.data);
+  };
+
   useEffect(() => {
     let mounted = true;
-    Promise.all([api.get("/players"), api.get("/teams/me")]).then(([p, t]) => {
+    const load = async () => {
+      try {
+        await api.post("/fantasy/sync");
+      } catch (err) {
+        // Sync failures should not block showing players.
+      }
+      const [p, t] = await Promise.all([api.get("/players"), api.get("/teams/me")]);
       if (!mounted) return;
       setPlayers(p.data);
       if (t.data) {
         setTeamName(t.data.name);
         setSelected(t.data.players.map((pl) => pl._id));
+        setCaptainId(t.data.captain ? String(t.data.captain) : "");
+        setViceCaptainId(t.data.viceCaptain ? String(t.data.viceCaptain) : "");
+        setSavedTeam({
+          players: t.data.players.map((pl) => pl._id),
+          captainId: t.data.captain ? String(t.data.captain) : "",
+          viceCaptainId: t.data.viceCaptain ? String(t.data.viceCaptain) : ""
+        });
+        setIsEditing(false);
         setTeamMeta({
           lockedInLeague: t.data.lockedInLeague || false,
           transfersLimit: t.data.transfersLimit ?? 120,
           transfersUsedTotal: t.data.transfersUsedTotal ?? 0,
           transfersByRound: t.data.transfersByRound || {},
           submittedAt: t.data.submittedAt || null,
-          lastSubmissionDate: t.data.lastSubmissionDate || null
+          lastSubmissionDate: t.data.lastSubmissionDate || null,
+          submittedForDate: t.data.submittedForDate || null
         });
       } else {
         setTeamMeta(null);
+        setSavedTeam({ players: [], captainId: "", viceCaptainId: "" });
+        setIsEditing(true);
       }
-    });
+    };
+    load();
 
-    const dateKey = todayUtc();
+    const dateKey = nextFixtureDateUtc();
     api.get("/fixtures")
       .then((res) => {
         if (!mounted) return;
         const matches = res.data?.matches || [];
-        const todays = matches.filter((m) => m.date === dateKey);
+        const matchDates = Array.from(new Set(matches.map((m) => m.date).filter(Boolean))).sort();
+        const nextApiDate = matchDates.find((d) => d > todayUtc()) || dateKey;
+        const todays = matches.filter((m) => m.date === nextApiDate);
         if (todays.length) {
           setFixtureDay(todays);
           setFixtureStatus("ok");
@@ -118,6 +167,48 @@ export default function TeamBuilder() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const timers = [];
+
+    const scheduleSync = (match) => {
+      if (!match?.date || !match?.timeGMT) return;
+      const start = new Date(`${match.date}T${match.timeGMT}:00Z`).getTime();
+      if (!Number.isFinite(start)) return;
+      const end = start + MATCH_DURATION_MS;
+      const now = Date.now();
+
+      const trigger = async () => {
+        if (cancelled) return;
+        try {
+          await api.post("/fantasy/sync");
+        } catch (err) {
+          // Ignore sync errors for scheduled refreshes.
+        }
+        if (cancelled) return;
+        await refreshPlayers(() => !cancelled);
+      };
+
+      if (end <= now && now - end <= SYNC_WINDOW_MS) {
+        trigger();
+        return;
+      }
+      if (end > now) {
+        const delay = end - now;
+        timers.push(setTimeout(trigger, delay));
+      }
+    };
+
+    if (fixtureDay.length) {
+      fixtureDay.forEach(scheduleSync);
+    }
+
+    return () => {
+      cancelled = true;
+      timers.forEach((t) => clearTimeout(t));
+    };
+  }, [fixtureDay]);
+
+  useEffect(() => {
     let mounted = true;
     setDailyPoints((prev) => ({ ...prev, loading: true }));
     const dateKey = todayUtc();
@@ -126,7 +217,7 @@ export default function TeamBuilder() {
         if (!mounted) return;
         setDailyPoints({
           total: res.data?.totalPoints ?? 0,
-          matches: res.data?.matchesCount ?? 0,
+          matches: res.data?.matches ?? 0,
           loading: false
         });
       })
@@ -158,6 +249,28 @@ export default function TeamBuilder() {
     const set = new Set(players.map((p) => p.country));
     return ["all", ...Array.from(set).sort()];
   }, [players]);
+
+  const roles = useMemo(() => {
+    const set = new Set(players.map((p) => p.role).filter(Boolean));
+    return ["all", ...Array.from(set).sort()];
+  }, [players]);
+
+  const priceRanges = useMemo(
+    () => [
+      { value: "all", label: "All Prices" },
+      { value: "0-2.5", label: "0-2.5" },
+      { value: "2.5-3", label: "2.5-3" },
+      { value: "3-4", label: "3-4" },
+      { value: "4-5", label: "4-5" },
+      { value: "5-6", label: "5-6" },
+      { value: "6-7", label: "6-7" },
+      { value: "7-8", label: "7-8" },
+      { value: "8-9", label: "8-9" },
+      { value: "9-10", label: "9-10" },
+      { value: "10+", label: "10+" }
+    ],
+    []
+  );
 
   const selectedPlayers = useMemo(
     () => selected.map((id) => players.find((p) => p._id === id)).filter(Boolean),
@@ -205,17 +318,51 @@ export default function TeamBuilder() {
     }, {});
   }, [selectedPlayers]);
 
+  const roleCounts = useMemo(() => {
+    const counts = { bat: 0, bowl: 0, wk: 0, ar: 0 };
+    selectedPlayers.forEach((p) => {
+      const role = String(p.role || "").toLowerCase();
+      if (role.includes("wk") || role.includes("keeper")) {
+        counts.wk += 1;
+      } else if (role.includes("all")) {
+        counts.ar += 1;
+      } else if (role.includes("bowl")) {
+        counts.bowl += 1;
+      } else {
+        counts.bat += 1;
+      }
+    });
+    return counts;
+  }, [selectedPlayers]);
+
   const filteredPlayers = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const [minRaw, maxRaw] = priceRange.includes("-") ? priceRange.split("-") : [null, null];
+    const min = minRaw ? Number(minRaw) : null;
+    const max = maxRaw ? Number(maxRaw) : null;
+    const minOk = min === null || !Number.isNaN(min);
+    const maxOk = max === null || !Number.isNaN(max);
     return players.filter((p) => {
       const matchQuery = !q || p.name.toLowerCase().includes(q);
       const matchTeam = teamFilter === "all" || p.country === teamFilter;
-      return matchQuery && matchTeam;
+      const matchRole = roleFilter === "all" || p.role === roleFilter;
+      const price = Number(p.price ?? 0);
+      let matchPrice = true;
+      if (priceRange === "10+") {
+        matchPrice = price >= 10;
+      } else if (priceRange !== "all" && minOk && maxOk) {
+        matchPrice = (min === null || price >= min) && (max === null || price <= max);
+      }
+      return matchQuery && matchTeam && matchRole && matchPrice;
     });
-  }, [players, query, teamFilter]);
+  }, [players, query, teamFilter, roleFilter, priceRange]);
 
   const toggle = (id) => {
     setStatus(null);
+    if (teamMeta && !isEditing) {
+      setStatus("Click Update Team to make changes.");
+      return;
+    }
     if (selected.includes(id)) {
       setSelected(selected.filter((s) => s !== id));
       return;
@@ -233,6 +380,20 @@ export default function TeamBuilder() {
       return;
     }
 
+    const role = String(player.role || "").toLowerCase();
+    let key = "bat";
+    if (role.includes("wk") || role.includes("keeper")) {
+      key = "wk";
+    } else if (role.includes("all")) {
+      key = "ar";
+    } else if (role.includes("bowl")) {
+      key = "bowl";
+    }
+    if ((roleCounts[key] || 0) + 1 > ROLE_LIMITS[key]) {
+      setStatus(`Max ${ROLE_LIMITS[key]} ${key === "wk" ? "wicket-keepers" : key === "ar" ? "all-rounders" : key === "bowl" ? "bowlers" : "batters"}.`);
+      return;
+    }
+
     if (totalCost + player.price > BUDGET) {
       setStatus("Budget exceeded. Remove a player first.");
       return;
@@ -241,13 +402,27 @@ export default function TeamBuilder() {
   };
 
   const todayKey = todayUtc();
+  const targetDateKey = useMemo(() => {
+    if (fixtureDay.length && fixtureDay[0]?.date) return fixtureDay[0].date;
+    return nextFixtureDateUtc();
+  }, [fixtureDay]);
   const isSubmissionLocked = submissionLock.locked;
   const lockCountdown = useMemo(() => {
     if (!isSubmissionLocked || !lockMeta.lockUntil) return null;
     const minutes = Math.max(0, Math.ceil((lockMeta.lockUntil - Date.now()) / 60000));
     return minutes;
   }, [isSubmissionLocked, lockMeta.lockUntil]);
-  const submittedToday = teamMeta?.lockedInLeague && teamMeta?.lastSubmissionDate === todayKey;
+  const submittedToday =
+    teamMeta?.lockedInLeague &&
+    teamMeta?.submittedForDate &&
+    teamMeta.submittedForDate === targetDateKey;
+  const hasCaptains = Boolean(captainId) && Boolean(viceCaptainId) && captainId !== viceCaptainId;
+  const formationOk =
+    roleCounts.bat <= ROLE_LIMITS.bat &&
+    roleCounts.bowl <= ROLE_LIMITS.bowl &&
+    roleCounts.wk <= ROLE_LIMITS.wk &&
+    roleCounts.ar <= ROLE_LIMITS.ar;
+  const canSubmitTeam = selected.length === TEAM_SIZE && formationOk && hasCaptains;
 
   const saveTeam = async () => {
     setStatus(null);
@@ -256,7 +431,16 @@ export default function TeamBuilder() {
         setStatus("Pick exactly 11 players before saving.");
         return;
       }
-      const res = await api.post("/teams", { name: teamName, playerIds: selected });
+      if (!hasCaptains) {
+        setStatus("Select a captain and a vice-captain.");
+        return;
+      }
+      const res = await api.post("/teams", {
+        name: teamName,
+        playerIds: selected,
+        captainId,
+        viceCaptainId
+      });
       if (res.data) {
         setTeamMeta((prev) => ({
           lockedInLeague: res.data.lockedInLeague ?? prev?.lockedInLeague ?? false,
@@ -267,12 +451,65 @@ export default function TeamBuilder() {
           postGroupResetDone: res.data.postGroupResetDone ?? prev?.postGroupResetDone ?? false,
           lastSubmissionDate: res.data.lastSubmissionDate ?? prev?.lastSubmissionDate ?? null
         }));
+        setSavedTeam({
+          players: [...selected],
+          captainId,
+          viceCaptainId
+        });
+        setIsEditing(false);
       }
       setStatus("Team saved successfully.");
     } catch (err) {
       setStatus(err.response?.data?.error || "Failed to save team");
     }
   };
+
+  useEffect(() => {
+    const selectedSet = new Set(selected.map(String));
+    if (captainId && !selectedSet.has(String(captainId))) {
+      setCaptainId("");
+    }
+    if (viceCaptainId && !selectedSet.has(String(viceCaptainId))) {
+      setViceCaptainId("");
+    }
+  }, [selected, captainId, viceCaptainId]);
+
+  useEffect(() => {
+    if (!teamMeta || !isEditing) return;
+    setEditSecondsLeft(240);
+    const id = setTimeout(() => {
+      setSelected(savedTeam.players || []);
+      setCaptainId(savedTeam.captainId || "");
+      setViceCaptainId(savedTeam.viceCaptainId || "");
+      setIsEditing(false);
+      setEditSecondsLeft(0);
+      setStatus("Edit timed out. Reverted to saved team.");
+    }, 240000);
+    return () => clearTimeout(id);
+  }, [teamMeta, isEditing, savedTeam]);
+
+  useEffect(() => {
+    if (!teamMeta || !isEditing) return;
+    const tick = setInterval(() => {
+      setEditSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [teamMeta, isEditing]);
+
+  const handleRemove = (id) => {
+    if (teamMeta && !isEditing) {
+      setStatus("Click Update Team to make changes.");
+      return;
+    }
+    setSelected((prev) => prev.filter((s) => String(s) !== String(id)));
+  };
+
+  const editTimerLabel = useMemo(() => {
+    const total = Math.max(0, editSecondsLeft || 0);
+    const minutes = String(Math.floor(total / 60)).padStart(2, "0");
+    const seconds = String(total % 60).padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  }, [editSecondsLeft]);
 
   return (
     <section className="page">
@@ -293,6 +530,14 @@ export default function TeamBuilder() {
             <div>
               <span className="muted">Players</span>
               <strong>{selected.length} / {TEAM_SIZE}</strong>
+            </div>
+            <div>
+              <span className="muted">Submission Date</span>
+              <strong>{targetDateKey} (UTC)</strong>
+            </div>
+            <div>
+              <span className="muted">Formation</span>
+              <strong>{roleCounts.wk} WK · {roleCounts.bat} BAT · {roleCounts.ar} AR · {roleCounts.bowl} BOWL</strong>
             </div>
             <div>
               <span className="muted">Budget</span>
@@ -316,7 +561,7 @@ export default function TeamBuilder() {
             <div className="notice">{submissionLock.message}{lockCountdown !== null ? ` (${lockCountdown} min)` : ""}</div>
           ) : null}
           {submittedToday ? (
-            <div className="notice">You have already submitted your team today.</div>
+            <div className="notice">You have already submitted your team for the next day.</div>
           ) : null}
           {teamMeta?.lockedInLeague ? (
             <div className="transfer-summary">
@@ -347,10 +592,43 @@ export default function TeamBuilder() {
             <div className="transfer-summary muted">Unlimited transfers until you submit a team into a league.</div>
           )}
           <div className="panel-block">
-            <div className="panel-title">Today's Fixtures (GMT)</div>
+            <div className="panel-title">Captaincy</div>
+            <div className="filter-group">
+              <label className="label">Captain</label>
+              <select
+                className="input"
+                value={captainId}
+                onChange={(e) => setCaptainId(e.target.value)}
+              >
+                <option value="">Select captain</option>
+                {selectedPlayers.map((player) => (
+                  <option key={`cap-${player._id}`} value={player._id}>
+                    {player.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="filter-group">
+              <label className="label">Vice-Captain</label>
+              <select
+                className="input"
+                value={viceCaptainId}
+                onChange={(e) => setViceCaptainId(e.target.value)}
+              >
+                <option value="">Select vice-captain</option>
+                {selectedPlayers.map((player) => (
+                  <option key={`vc-${player._id}`} value={player._id}>
+                    {player.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="panel-block">
+            <div className="panel-title">Next Day Fixtures (GMT)</div>
             {fixtureStatus === "loading" && <div className="muted">Loading fixtures...</div>}
             {fixtureStatus === "error" && <div className="muted">Fixtures unavailable.</div>}
-            {fixtureStatus === "empty" && <div className="muted">No fixtures today.</div>}
+            {fixtureStatus === "empty" && <div className="muted">No fixtures for next day.</div>}
             {fixtureStatus === "ok" && (
               <div className="fixture-mini">
                 {fixtureDay.map((match, idx) => (
@@ -364,12 +642,42 @@ export default function TeamBuilder() {
               </div>
             )}
           </div>
-          <button className="btn btn--primary" onClick={saveTeam} disabled={isSubmissionLocked || submittedToday}>
-            {teamMeta ? (teamMeta.lockedInLeague ? "Transfer Team" : "Update Team") : "Submit Team"}
+          <div className="muted">
+            Formation limits: max 5 batters, 5 bowlers, 4 wicket-keepers, 4 all-rounders.
+          </div>
+          <button
+            className="btn btn--primary"
+            onClick={() => {
+              if (teamMeta && !isEditing) {
+                setIsEditing(true);
+                setEditSecondsLeft(240);
+                setStatus("Editing enabled. Update your XI and submit.");
+                return;
+              }
+              saveTeam();
+            }}
+            disabled={
+              isSubmissionLocked ||
+              submittedToday ||
+              (isEditing && !canSubmitTeam)
+            }
+          >
+            {teamMeta && !isEditing ? "Update Team" : selected.length > 0 ? "Submit Team" : "Select Team"}
+            {teamMeta && isEditing ? ` (${editTimerLabel})` : ""}
           </button>
         </div>
 
         <div>
+          <div className="panel-block">
+            <div className="panel-title">Selected XI</div>
+            <SelectedTeamField
+              players={selectedPlayers}
+              captainId={captainId}
+              viceCaptainId={viceCaptainId}
+              canEdit={!teamMeta || isEditing}
+              onRemove={handleRemove}
+            />
+          </div>
           <div className="filters">
             <div className="filter-group">
               <label className="label">Search Player</label>
@@ -390,6 +698,34 @@ export default function TeamBuilder() {
                 {teams.map((team) => (
                   <option key={team} value={team}>
                     {team === "all" ? "All Teams" : team}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="filter-group">
+              <label className="label">Role</label>
+              <select
+                className="input"
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+              >
+                {roles.map((role) => (
+                  <option key={role} value={role}>
+                    {role === "all" ? "All Roles" : role}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="filter-group">
+              <label className="label">Price Range (m)</label>
+              <select
+                className="input"
+                value={priceRange}
+                onChange={(e) => setPriceRange(e.target.value)}
+              >
+                {priceRanges.map((range) => (
+                  <option key={range.value} value={range.value}>
+                    {range.label}
                   </option>
                 ))}
               </select>
@@ -416,12 +752,17 @@ export default function TeamBuilder() {
                 >
                   <div className="card__top">
                     <h4>{player.name}</h4>
-                    <span className="pill">{player.role}</span>
+                    <div className="pill-group">
+                      {player.availabilityTag ? (
+                        <span className="pill pill--warn">{player.availabilityTag}</span>
+                      ) : null}
+                      <span className="pill">{player.role}</span>
+                    </div>
                   </div>
                   <div className="muted">{player.country}</div>
                   <div className="card__footer">
                     <span className="price">Price £{formatPrice(player.price)}m</span>
-                    <span className="points">Pts {player.points}</span>
+                    <span className="points">Total Pts {player.points}</span>
                   </div>
                 </button>
               );

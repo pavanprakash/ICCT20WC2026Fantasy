@@ -5,6 +5,8 @@ const TeamSchema = new mongoose.Schema(
     name: { type: String, required: true },
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     players: [{ type: mongoose.Schema.Types.ObjectId, ref: "Player", required: true }],
+    captain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
+    viceCaptain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
     lockedInLeague: { type: Boolean, default: false },
     transfersLimit: { type: Number, default: 165 },
     transfersUsedTotal: { type: Number, default: 0 },
@@ -12,6 +14,7 @@ const TeamSchema = new mongoose.Schema(
     transferPhase: { type: String, default: "GROUP" },
     postGroupResetDone: { type: Boolean, default: false },
     lastSubmissionDate: { type: String },
+    submittedForDate: { type: String },
     submittedAt: { type: Date }
   },
   { timestamps: true }

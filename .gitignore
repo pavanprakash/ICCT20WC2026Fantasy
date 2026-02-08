@@ -1,5 +1,5 @@
 # dependencies
-node_modules/
+node_modules
 
 # env files
 .env
@@ -31,3 +31,6 @@ yarn-error.log*
 .vscode/
 *.log
 *.tmp
+
+client/node_modules
+server/node_modules

@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../api.js";
 
+const MATCH_DURATION_MS = 4 * 60 * 60 * 1000;
+const SYNC_WINDOW_MS = 10 * 60 * 1000;
+
 const formatPrice = (value) => Number(value || 0).toFixed(1);
 
 export default function Players() {
@@ -8,19 +11,86 @@ export default function Players() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [teamFilter, setTeamFilter] = useState("all");
+  const [fixtures, setFixtures] = useState([]);
 
   useEffect(() => {
     let mounted = true;
-    api.get("/players").then((res) => {
+    const loadPlayers = async () => {
+      try {
+        await api.post("/fantasy/sync");
+      } catch (err) {
+        // Sync failures should not block showing players.
+      }
+      const res = await api.get("/players");
       if (mounted) {
         setPlayers(res.data);
         setLoading(false);
       }
-    });
+    };
+    const loadFixtures = async () => {
+      try {
+        const res = await api.get("/fixtures");
+        if (mounted) {
+          setFixtures(res.data?.matches || []);
+        }
+      } catch (err) {
+        if (mounted) {
+          setFixtures([]);
+        }
+      }
+    };
+    loadPlayers();
+    loadFixtures();
     return () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!fixtures.length) return;
+    let cancelled = false;
+    const timers = [];
+    const todayKey = new Date().toISOString().slice(0, 10);
+
+    const scheduleSync = (match) => {
+      if (!match?.date || !match?.timeGMT) return;
+      if (match.date !== todayKey) return;
+      const start = new Date(`${match.date}T${match.timeGMT}:00Z`).getTime();
+      if (!Number.isFinite(start)) return;
+      const end = start + MATCH_DURATION_MS;
+      const now = Date.now();
+
+      const trigger = async () => {
+        if (cancelled) return;
+        try {
+          await api.post("/fantasy/sync");
+        } catch (err) {
+          // Ignore sync errors for scheduled refreshes.
+        }
+        if (cancelled) return;
+        const res = await api.get("/players");
+        if (!cancelled) {
+          setPlayers(res.data);
+        }
+      };
+
+      if (end <= now && now - end <= SYNC_WINDOW_MS) {
+        trigger();
+        return;
+      }
+      if (end > now) {
+        const delay = end - now;
+        timers.push(setTimeout(trigger, delay));
+      }
+    };
+
+    fixtures.forEach(scheduleSync);
+
+    return () => {
+      cancelled = true;
+      timers.forEach((t) => clearTimeout(t));
+    };
+  }, [fixtures]);
 
   const teams = useMemo(() => {
     const set = new Set(players.map((p) => p.country));

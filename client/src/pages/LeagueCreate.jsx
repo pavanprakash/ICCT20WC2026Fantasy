@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api.js";
 
 export default function LeagueCreate() {
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [status, setStatus] = useState(null);
@@ -17,6 +19,9 @@ export default function LeagueCreate() {
       setCreated(res.data);
       setStatus("League created successfully.");
       setName("");
+      if (res.data?.id) {
+        navigate(`/league/${res.data.id}`);
+      }
     } catch (err) {
       setStatus(err.response?.data?.error || "Failed to create league");
     }
@@ -31,6 +36,9 @@ export default function LeagueCreate() {
       setJoined(res.data);
       setStatus("Joined league successfully.");
       setCode("");
+      if (res.data?.id) {
+        navigate(`/league/${res.data.id}`);
+      }
     } catch (err) {
       setStatus(err.response?.data?.error || "Failed to join league");
     }

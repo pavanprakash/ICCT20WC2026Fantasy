@@ -2,6 +2,7 @@ import express from "express";
 import League from "../models/League.js";
 import Team from "../models/Team.js";
 import fixtures from "../data/fixtures-2026.js";
+import { buildLeagueDashboard } from "../jobs/dailyLeagueUpdate.js";
 import { authRequired } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -94,6 +95,40 @@ router.get("/mine", authRequired, async (req, res) => {
     .select("name code owner")
     .lean();
   res.json(leagues);
+});
+
+router.get("/mine/standings", authRequired, async (req, res) => {
+  const leagues = await League.find({ members: req.user.id }).lean();
+  const dashboards = await Promise.all(
+    leagues.map((league) => buildLeagueDashboard(league._id))
+  );
+  const payload = dashboards
+    .filter(Boolean)
+    .map((dash) => {
+      const standings = dash.standings || [];
+      const me = standings.find((row) => String(row.userId) === String(req.user.id));
+      return {
+        id: dash.id,
+        name: dash.name,
+        code: dash.code,
+        standingsUpdatedAt: dash.standingsUpdatedAt || null,
+        myRank: me?.rank ?? null,
+        myPoints: me?.points ?? 0,
+        myTeamName: me?.teamName ?? "No Team",
+        standings
+      };
+    });
+  res.json(payload);
+});
+
+router.get("/:id/dashboard", authRequired, async (req, res) => {
+  const league = await League.findById(req.params.id).lean();
+  if (!league) return res.status(404).json({ error: "League not found" });
+  const isMember = league.members?.some((m) => String(m) === String(req.user.id));
+  if (!isMember) return res.status(403).json({ error: "Not a league member" });
+
+  const dashboard = await buildLeagueDashboard(req.params.id);
+  res.json(dashboard);
 });
 
 export default router;

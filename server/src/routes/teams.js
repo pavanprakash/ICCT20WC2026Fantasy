@@ -31,11 +31,24 @@ function diffTransfers(oldIds, newIds) {
 const GROUP_LIMIT = 120;
 const FINAL_LIMIT = 45;
 const LOCK_GRACE_MINUTES = 4;
+const ROLE_LIMITS = {
+  bat: 5,
+  bowl: 5,
+  wk: 4,
+  ar: 4
+};
 
 function parseUtc(dateStr, timeStr) {
   if (!dateStr || !timeStr) return null;
   const [h, m] = timeStr.split(":").map(Number);
   return Date.UTC(Number(dateStr.slice(0, 4)), Number(dateStr.slice(5, 7)) - 1, Number(dateStr.slice(8, 10)), h, m);
+}
+
+function nextFixtureDateUtc() {
+  const today = new Date().toISOString().slice(0, 10);
+  const dates = fixtures.map((f) => f.date);
+  const unique = Array.from(new Set(dates)).filter((d) => d > today).sort();
+  return unique[0] || today;
 }
 
 async function getTodayFirstStartUtc() {
@@ -59,6 +72,30 @@ async function getTodayFirstStartUtc() {
     if (times.length) return Math.min(...times);
   } catch (e) {
     // fall back to static fixtures data (no times)
+  }
+  return null;
+}
+
+async function getFirstStartForDateUtc(dateStr) {
+  try {
+    const data = await cricapiGet("/matches", {});
+    const list = Array.isArray(data?.data) ? data.data : [];
+    const matches = list.filter((m) => {
+      const name = `${m?.name || ""} ${m?.series || ""} ${m?.seriesName || ""}`.toLowerCase();
+      return name.includes("t20") && name.includes("world cup") && name.includes("2026");
+    });
+    const dateMatches = matches.map((m) => {
+      const dt = m?.dateTimeGMT || m?.dateTime;
+      if (!dt) return null;
+      const iso = new Date(dt).toISOString();
+      const date = iso.slice(0, 10);
+      const time = iso.slice(11, 16);
+      return { date, time };
+    }).filter(Boolean).filter((m) => m.date === dateStr);
+    const times = dateMatches.map((m) => parseUtc(m.date, m.time)).filter(Boolean);
+    if (times.length) return Math.min(...times);
+  } catch (e) {
+    // fall back to static fixtures (no times)
   }
   return null;
 }
@@ -114,12 +151,15 @@ router.get("/me", authRequired, async (req, res) => {
     transferPhase: phase,
     postGroupResetDone: team.postGroupResetDone || false,
     lastSubmissionDate: team.lastSubmissionDate || null,
-    submittedAt: team.submittedAt || team.createdAt
+    submittedForDate: team.submittedForDate || null,
+    submittedAt: team.submittedAt || team.createdAt,
+    captain: team.captain || null,
+    viceCaptain: team.viceCaptain || null
   });
 });
 
 router.post("/", authRequired, async (req, res) => {
-  const { name, playerIds } = req.body;
+  const { name, playerIds, captainId, viceCaptainId } = req.body;
   if (!name || !Array.isArray(playerIds)) {
     return res.status(400).json({ error: "Missing fields" });
   }
@@ -132,6 +172,17 @@ router.post("/", authRequired, async (req, res) => {
   const players = await Player.find({ _id: { $in: uniqueIds } }).lean();
   if (players.length !== 11) {
     return res.status(400).json({ error: "Invalid players selected" });
+  }
+
+  if (!captainId || !viceCaptainId) {
+    return res.status(400).json({ error: "Captain and vice-captain are required" });
+  }
+  if (String(captainId) === String(viceCaptainId)) {
+    return res.status(400).json({ error: "Captain and vice-captain must be different" });
+  }
+  const idSet = new Set(uniqueIds.map(String));
+  if (!idSet.has(String(captainId)) || !idSet.has(String(viceCaptainId))) {
+    return res.status(400).json({ error: "Captain and vice-captain must be in your XI" });
   }
 
   const byCountry = players.reduce((acc, p) => {
@@ -148,18 +199,45 @@ router.post("/", authRequired, async (req, res) => {
     return res.status(400).json({ error: "Budget exceeded (max 100)" });
   }
 
+  const roleCounts = players.reduce(
+    (acc, p) => {
+      const role = String(p.role || "").toLowerCase();
+      if (role.includes("wk") || role.includes("keeper")) acc.wk += 1;
+      else if (role.includes("all")) acc.ar += 1;
+      else if (role.includes("bowl")) acc.bowl += 1;
+      else acc.bat += 1;
+      return acc;
+    },
+    { bat: 0, bowl: 0, wk: 0, ar: 0 }
+  );
+  if (roleCounts.bat > ROLE_LIMITS.bat ||
+      roleCounts.bowl > ROLE_LIMITS.bowl ||
+      roleCounts.wk > ROLE_LIMITS.wk ||
+      roleCounts.ar > ROLE_LIMITS.ar) {
+    return res.status(400).json({
+      error: "Formation limits exceeded (max 5 batters, 5 bowlers, 4 wicket-keepers, 4 all-rounders)."
+    });
+  }
+
   const existing = await Team.findOne({ user: req.user.id });
   const phase = getTransferPhase();
   const today = new Date().toISOString().slice(0, 10);
+  const targetDate = nextFixtureDateUtc();
   const lock = await isSubmissionLockedNow();
   if (lock.locked) {
     return res.status(403).json({ error: "Submissions are locked for the first 4 minutes after the first match starts." });
   }
 
+  const firstStartTarget = await getFirstStartForDateUtc(targetDate);
+  if (firstStartTarget && Date.now() >= firstStartTarget) {
+    return res.status(403).json({ error: "Submissions for the next day are closed after the first match starts." });
+  }
+
+  if (existing?.submittedForDate === targetDate) {
+    return res.status(400).json({ error: `You have already submitted your team for ${targetDate}.` });
+  }
+
   if (existing) {
-    if (existing.lockedInLeague && existing.lastSubmissionDate === today) {
-      return res.status(400).json({ error: "You can submit your team only once per day." });
-    }
     if (existing.lockedInLeague) {
       if (phase === "FINAL" && !existing.postGroupResetDone) {
         // One-time post-group reset: unlimited transfers before final phase cap applies
@@ -195,7 +273,10 @@ router.post("/", authRequired, async (req, res) => {
 
     existing.name = name;
     existing.players = uniqueIds;
+    existing.captain = captainId;
+    existing.viceCaptain = viceCaptainId;
     existing.lastSubmissionDate = today;
+    existing.submittedForDate = targetDate;
     await existing.save();
     return res.json({
       id: existing._id,
@@ -206,7 +287,10 @@ router.post("/", authRequired, async (req, res) => {
       transfersByRound: existing.transfersByRound || {},
       transferPhase: existing.transferPhase || phase,
       postGroupResetDone: existing.postGroupResetDone || false,
-      lastSubmissionDate: existing.lastSubmissionDate || null
+      lastSubmissionDate: existing.lastSubmissionDate || null,
+      submittedForDate: existing.submittedForDate || null,
+      captain: existing.captain || null,
+      viceCaptain: existing.viceCaptain || null
     });
   }
 
@@ -216,6 +300,8 @@ router.post("/", authRequired, async (req, res) => {
     name,
     user: req.user.id,
     players: uniqueIds,
+    captain: captainId,
+    viceCaptain: viceCaptainId,
     lockedInLeague: Boolean(member),
     transfersLimit: transferPhase === "GROUP" ? GROUP_LIMIT : FINAL_LIMIT,
     transfersUsedTotal: 0,
@@ -223,6 +309,7 @@ router.post("/", authRequired, async (req, res) => {
     transferPhase,
     postGroupResetDone: transferPhase === "FINAL",
     lastSubmissionDate: today,
+    submittedForDate: targetDate,
     submittedAt: new Date()
   });
   res.json({
@@ -234,7 +321,10 @@ router.post("/", authRequired, async (req, res) => {
     transfersByRound: team.transfersByRound || {},
     transferPhase: team.transferPhase || transferPhase,
     postGroupResetDone: team.postGroupResetDone || false,
-    lastSubmissionDate: team.lastSubmissionDate || null
+    lastSubmissionDate: team.lastSubmissionDate || null,
+    submittedForDate: team.submittedForDate || null,
+    captain: team.captain || null,
+    viceCaptain: team.viceCaptain || null
   });
 });
 

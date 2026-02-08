@@ -9,6 +9,8 @@ import leagueRoutes from "./routes/leagues.js";
 import cricapiRoutes from "./routes/cricapi.js";
 import fantasyRoutes from "./routes/fantasy.js";
 import fixturesRoutes from "./routes/fixtures.js";
+import cron from "node-cron";
+import { updateAllLeaguesDaily } from "./jobs/dailyLeagueUpdate.js";
 
 dotenv.config();
 
@@ -50,6 +52,18 @@ mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log("MongoDB connected");
+    cron.schedule(
+      "0 20 * * *",
+      async () => {
+        try {
+          const result = await updateAllLeaguesDaily();
+          console.log("Daily league update completed", result);
+        } catch (err) {
+          console.error("Daily league update failed:", err.message);
+        }
+      },
+      { timezone: "UTC" }
+    );
     app.listen(PORT, () => console.log(`Server running on ${PORT}`));
   })
   .catch((err) => {

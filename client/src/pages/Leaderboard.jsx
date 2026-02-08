@@ -3,16 +3,22 @@ import api from "../api.js";
 
 export default function Leaderboard() {
   const [rows, setRows] = useState([]);
+  const [leagueStandings, setLeagueStandings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-    api.get("/teams/leaderboard").then((res) => {
-      if (mounted) {
-        setRows(res.data);
+    Promise.all([api.get("/teams/leaderboard"), api.get("/leagues/mine/standings")])
+      .then(([leaderboardRes, leaguesRes]) => {
+        if (!mounted) return;
+        setRows(leaderboardRes.data);
+        setLeagueStandings(leaguesRes.data || []);
         setLoading(false);
-      }
-    });
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setLoading(false);
+      });
     return () => {
       mounted = false;
     };
@@ -26,6 +32,37 @@ export default function Leaderboard() {
         <h2>Leaderboard</h2>
         <p>Top fantasy teams ranked by points.</p>
       </div>
+
+      {leagueStandings.length > 0 && (
+        <div className="panel-block">
+          <div className="panel-title">Your League Rankings</div>
+          {leagueStandings.map((league) => (
+            <div key={league.id} className="panel-block">
+              <div className="panel-title">{league.name}</div>
+              <div className="muted">
+                Team: {league.myTeamName} · Rank: {league.myRank ?? "—"} · Points: {league.myPoints}
+              </div>
+              <div className="table">
+                <div className="table__row table__head">
+                  <span>Rank</span>
+                  <span>Manager</span>
+                  <span>Team</span>
+                  <span>Points</span>
+                </div>
+                {(league.standings || []).map((row) => (
+                  <div className="table__row" key={row.userId}>
+                    <span>#{row.rank}</span>
+                    <span>{row.userName}</span>
+                    <span>{row.teamName}</span>
+                    <span>{row.points}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="table">
         <div className="table__row table__head">
           <span>Rank</span>

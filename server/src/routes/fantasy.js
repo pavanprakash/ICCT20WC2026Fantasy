@@ -17,9 +17,17 @@ function normalizeName(value) {
 }
 
 function isCompletedMatch(match) {
+  const ms = String(match?.ms || "").toLowerCase();
+  if (ms === "result") return true;
   if (match?.matchEnded === true) return true;
   const status = String(match?.status || match?.matchStatus || "").toLowerCase();
-  return /match ended|result|won|abandoned|no result|draw|tied|complete|completed|match over/.test(status);
+  return /match ended|result|won|abandoned|no result|draw|tied|complete|completed|match over|finished/.test(status);
+}
+
+function isCompletedScorecard(scoreData) {
+  if (scoreData?.matchEnded === true) return true;
+  const status = String(scoreData?.status || scoreData?.matchStatus || "").toLowerCase();
+  return /match ended|result|won|abandoned|no result|draw|tied|complete|completed|match over|finished/.test(status);
 }
 
 
@@ -31,18 +39,12 @@ function matchDateFromMatch(match) {
 }
 
 function isT20WorldCup2026(match) {
-  const hay = [
-    match?.name,
-    match?.series,
-    match?.seriesName,
-    match?.matchType,
-    match?.matchTypeLower
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  const dateText = `${match?.dateTime || ""} ${match?.dateTimeGMT || ""} ${match?.date || ""}`;
-  return hay.includes("t20") && hay.includes("world cup") && (hay.includes("2026") || dateText.includes("2026"));
+  const seriesId = String(match?.series_id || match?.seriesId || "");
+  const expected = String(process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510");
+  if (seriesId && seriesId === expected) return true;
+  const series = String(match?.series || match?.seriesName || "").toLowerCase();
+  if (!series) return true;
+  return series === "icc men's t20 world cup 2026";
 }
 
 async function ensureRules() {
@@ -86,7 +88,8 @@ router.get("/score/:matchId", async (req, res) => {
     const warnings = [
       "Dot ball points and LBW/Bowled bonuses require ball-by-ball data and are not applied.",
       "Run-out direct/indirect and stumping points require detailed fielding data and may be incomplete.",
-      "Captain/Vice-captain multipliers are not applied in this endpoint."
+      "Captain/Vice-captain multipliers are not applied in this endpoint.",
+      "Live match points are provisional and will update as the scorecard changes."
     ];
 
     const payload = {
@@ -113,22 +116,43 @@ router.post("/sync", async (req, res) => {
   try {
     await ensureRules();
     const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
-    const apiData = await cricapiGet("/matches", {});
-    const list = Array.isArray(apiData?.data) ? apiData.data : [];
-    const matches = list.filter(isT20WorldCup2026).filter(isCompletedMatch);
+    const seriesInfo = await cricapiGet("/series_info", {
+      id: process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510"
+    }, process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY);
+    const rawMatches =
+      seriesInfo?.data?.matchList ||
+      seriesInfo?.data?.matches ||
+      seriesInfo?.data?.match ||
+      [];
+    const list = Array.isArray(rawMatches) ? rawMatches : [];
+    const matches = list.filter(isT20WorldCup2026);
 
     const aggregate = new Map();
+    let processed = 0;
 
     for (const match of matches) {
-      if (!match?.id) continue;
-      const scoreData = await cricapiGet("/match_scorecard", { id: match.id });
-      const scorecard = scoreData?.data?.scorecard || scoreData?.data?.innings || scoreData?.data;
+      const matchId = match?.id || match?.match_id || match?.matchId || match?.unique_id;
+      if (!matchId) continue;
+      const scoreData = await cricapiGet(
+        "/match_scorecard",
+        { id: matchId },
+        process.env.CRICAPI_SCORECARD_KEY || process.env.CRICAPI_KEY
+      );
+      const scoreRoot = scoreData?.data;
+      if (!isCompletedMatch(match) && !isCompletedScorecard(scoreRoot)) {
+        continue;
+      }
+      const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
       const points = calculateMatchPoints(scorecard, rules);
+      if (!points.length) {
+        continue;
+      }
+      processed += 1;
 
       const matchDate = matchDateFromMatch(match);
       await FantasyMatchPoints.findOneAndUpdate(
-        { matchId: match.id, ruleset: rules.name },
-        { matchId: match.id, matchDate, ruleset: rules.name, points },
+        { matchId: matchId, ruleset: rules.name },
+        { matchId: matchId, matchDate, ruleset: rules.name, points },
         { upsert: true, new: true }
       );
 
@@ -158,7 +182,7 @@ router.post("/sync", async (req, res) => {
 
     res.json({
       ok: true,
-      matchesProcessed: matches.length,
+      matchesProcessed: processed,
       playersUpdated: players.length,
       updatedAt: new Date().toISOString()
     });

@@ -89,15 +89,23 @@ function getFieldingEntries(innings) {
 }
 
 function normalizeName(entry) {
-  return String(
+  const name =
     entry?.name ||
+    entry?.fullName ||
+    entry?.shortName ||
+    entry?.batsman?.name ||
+    entry?.batsman?.fullName ||
+    entry?.bowler?.name ||
+    entry?.bowler?.fullName ||
+    entry?.catcher?.name ||
+    entry?.catcher?.fullName ||
+    entry?.player?.name ||
+    entry?.player?.fullName ||
     entry?.batsman ||
     entry?.bowler ||
     entry?.player ||
-    entry?.fullName ||
-    entry?.shortName ||
-    ""
-  ).trim();
+    "";
+  return String(name).trim();
 }
 
 function battingPoints(entry, rules) {

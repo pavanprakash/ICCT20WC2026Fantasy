@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Routes, Route, Navigate, Link, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation, useNavigate } from "react-router-dom";
 import api, { setAuthToken } from "./api.js";
 import Home from "./pages/Home.jsx";
 import Players from "./pages/Players.jsx";
@@ -7,6 +7,7 @@ import TeamBuilder from "./pages/TeamBuilder.jsx";
 import Leaderboard from "./pages/Leaderboard.jsx";
 import Auth from "./pages/Auth.jsx";
 import LeagueCreate from "./pages/LeagueCreate.jsx";
+import LeagueDashboard from "./pages/LeagueDashboard.jsx";
 import Fixtures from "./pages/Fixtures.jsx";
 import Rules from "./pages/Rules.jsx";
 
@@ -20,7 +21,6 @@ function Navbar({ user, onLogout }) {
         </Link>
       </div>
       <nav className="nav__links">
-        <Link to="/players">Players</Link>
         <Link to="/fixtures">Fixtures</Link>
         <Link to="/rules">Rules</Link>
         <Link to="/team">Create Team</Link>
@@ -47,6 +47,7 @@ function Navbar({ user, onLogout }) {
 
 export default function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -55,14 +56,24 @@ export default function App() {
       const data = JSON.parse(stored);
       setUser(data.user);
       setAuthToken(data.token);
+      const lastPath = localStorage.getItem("fantasy_last_path");
+      if (lastPath && lastPath !== "/auth" && location.pathname === "/auth") {
+        navigate(lastPath, { replace: true });
+      }
     }
   }, []);
+
+  useEffect(() => {
+    if (user && location.pathname) {
+      localStorage.setItem("fantasy_last_path", location.pathname);
+    }
+  }, [user, location.pathname]);
 
   const handleAuth = (data) => {
     localStorage.setItem("fantasy_auth", JSON.stringify(data));
     setUser(data.user);
     setAuthToken(data.token);
-    navigate("/team");
+    navigate("/leaderboard");
   };
 
   const handleLogout = () => {
@@ -92,7 +103,14 @@ export default function App() {
             path="/league"
             element={user ? <LeagueCreate /> : <Navigate to="/auth" />}
           />
-          <Route path="/auth" element={<Auth onAuth={handleAuth} />} />
+          <Route
+            path="/league/:id"
+            element={user ? <LeagueDashboard /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/auth"
+            element={user ? <Navigate to="/leaderboard" /> : <Auth onAuth={handleAuth} />}
+          />
         </Routes>
       </main>
       <footer className="footer">

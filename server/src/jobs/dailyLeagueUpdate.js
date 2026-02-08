@@ -1,12 +1,11 @@
-import dotenv from "dotenv";
-import mongoose from "mongoose";
 import FantasyRule from "../models/FantasyRule.js";
 import FantasyMatchPoints from "../models/FantasyMatchPoints.js";
 import Player from "../models/Player.js";
+import Team from "../models/Team.js";
+import League from "../models/League.js";
+import User from "../models/User.js";
 import { cricapiGet } from "../services/cricapi.js";
 import { calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
-
-dotenv.config();
 
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
 const SERIES_KEY = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
@@ -20,19 +19,18 @@ function normalizeName(value) {
 }
 
 function isCompletedMatch(match) {
+  if (match?.matchEnded === true) return true;
   const ms = String(match?.ms || "").toLowerCase();
   if (ms === "result") return true;
-  if (match?.matchEnded === true) return true;
   const status = String(match?.status || match?.matchStatus || "").toLowerCase();
-  return /match ended|result|won|abandoned|no result|draw|tied|complete|completed|match over|finished/.test(status);
+  return /match ended|result|won|abandoned|no result|draw|tied|complete|completed|match over/.test(status);
 }
 
 function isCompletedScorecard(scoreData) {
   if (scoreData?.matchEnded === true) return true;
   const status = String(scoreData?.status || scoreData?.matchStatus || "").toLowerCase();
-  return /match ended|result|won|abandoned|no result|draw|tied|complete|completed|match over|finished/.test(status);
+  return /match ended|result|won|abandoned|no result|draw|tied|complete|completed|match over/.test(status);
 }
-
 
 function matchDateFromMatch(match) {
   const dt = match?.dateTimeGMT || match?.dateTime;
@@ -56,11 +54,7 @@ async function ensureRules() {
   }
 }
 
-async function run() {
-  const mongoUri = process.env.MONGODB_URI;
-  if (!mongoUri) throw new Error("MONGODB_URI is not set");
-
-  await mongoose.connect(mongoUri);
+async function syncFantasyPoints() {
   await ensureRules();
   const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
 
@@ -71,7 +65,9 @@ async function run() {
     seriesInfo?.data?.match ||
     [];
   const list = Array.isArray(rawMatches) ? rawMatches : [];
-  const matches = list.filter(isT20WorldCup2026);
+  const matches = list
+    .filter(isT20WorldCup2026)
+    .filter(Boolean);
 
   const aggregate = new Map();
   let processed = 0;
@@ -122,17 +118,84 @@ async function run() {
     await Player.bulkWrite(bulk);
   }
 
-  console.log(JSON.stringify({
-    ok: true,
-    matchesProcessed: processed,
-    playersUpdated: players.length,
-    updatedAt: new Date().toISOString()
-  }));
-
-  await mongoose.disconnect();
+  return { matchesProcessed: processed, playersUpdated: players.length };
 }
 
-run().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+function calcPoints(player) {
+  const runs = player.stats?.runs || 0;
+  const wickets = player.stats?.wickets || 0;
+  const catches = player.stats?.catches || 0;
+  return runs + wickets * 20 + catches * 10;
+}
+
+function teamPoints(players) {
+  return players.reduce((sum, p) => {
+    if (Number.isFinite(p.fantasyPoints)) {
+      return sum + p.fantasyPoints;
+    }
+    return sum + calcPoints(p);
+  }, 0);
+}
+
+async function computeLeagueStandings(league) {
+  const memberIds = league.members || [];
+  const users = await User.find({ _id: { $in: memberIds } }).select("name").lean();
+  const userMap = new Map(users.map((u) => [String(u._id), u.name]));
+
+  const teams = await Team.find({ user: { $in: memberIds } })
+    .populate("players")
+    .lean();
+  const teamMap = new Map(teams.map((t) => [String(t.user), t]));
+
+  const rows = memberIds.map((id) => {
+    const team = teamMap.get(String(id));
+    const players = team?.players || [];
+    const points = team ? teamPoints(players) : 0;
+    return {
+      userId: String(id),
+      userName: userMap.get(String(id)) || "Unknown",
+      teamId: team?._id || null,
+      teamName: team?.name || "No Team",
+      points
+    };
+  });
+
+  rows.sort((a, b) => b.points - a.points);
+  const ranked = rows.map((row, idx) => ({ ...row, rank: idx + 1 }));
+  return ranked;
+}
+
+export async function updateAllLeaguesDaily() {
+  const sync = await syncFantasyPoints();
+  const leagues = await League.find({}).lean();
+  for (const league of leagues) {
+    const standings = await computeLeagueStandings(league);
+    await League.updateOne(
+      { _id: league._id },
+      { $set: { standings, standingsUpdatedAt: new Date() } }
+    );
+  }
+  return { leaguesUpdated: leagues.length, ...sync };
+}
+
+export async function buildLeagueDashboard(leagueId) {
+  const league = await League.findById(leagueId).lean();
+  if (!league) return null;
+  let standings = Array.isArray(league.standings) ? league.standings : [];
+  let updatedAt = league.standingsUpdatedAt || null;
+  if (!standings.length) {
+    standings = await computeLeagueStandings(league);
+    updatedAt = new Date();
+    await League.updateOne(
+      { _id: league._id },
+      { $set: { standings, standingsUpdatedAt: updatedAt } }
+    );
+  }
+  return {
+    id: league._id,
+    name: league.name,
+    code: league.code,
+    standings,
+    standingsUpdatedAt: updatedAt
+  };
+}

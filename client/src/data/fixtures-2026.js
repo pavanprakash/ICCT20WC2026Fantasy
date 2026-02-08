@@ -1,13 +1,13 @@
 const fixtures = [
   { date: "2026-02-07", time: "11:00 AM", timeGMT: "05:30", team1: "PAK", team2: "NED", venue: "SSC, Colombo", stage: "Group" },
-  { date: "2026-02-07", time: "3:00 PM", timeGMT: "09:30", team1: "WI", team2: "BAN", venue: "Kolkata", stage: "Group" },
+  { date: "2026-02-07", time: "3:00 PM", timeGMT: "09:30", team1: "WI", team2: "SCO", venue: "Kolkata", stage: "Group" },
   { date: "2026-02-07", time: "7:00 PM", timeGMT: "13:30", team1: "IND", team2: "USA", venue: "Mumbai", stage: "Group" },
 
   { date: "2026-02-08", time: "11:00 AM", timeGMT: "05:30", team1: "NZ", team2: "AFG", venue: "Chennai", stage: "Group" },
   { date: "2026-02-08", time: "3:00 PM", timeGMT: "09:30", team1: "ENG", team2: "NEP", venue: "Mumbai", stage: "Group" },
   { date: "2026-02-08", time: "7:00 PM", timeGMT: "13:30", team1: "SL", team2: "IRE", venue: "Premadasa, Colombo", stage: "Group" },
 
-  { date: "2026-02-09", time: "11:00 AM", timeGMT: "05:30", team1: "BAN", team2: "ITA", venue: "Kolkata", stage: "Group" },
+  { date: "2026-02-09", time: "11:00 AM", timeGMT: "05:30", team1: "SCO", team2: "ITA", venue: "Kolkata", stage: "Group" },
   { date: "2026-02-09", time: "3:00 PM", timeGMT: "09:30", team1: "ZIM", team2: "OMA", venue: "SSC, Colombo", stage: "Group" },
   { date: "2026-02-09", time: "7:00 PM", timeGMT: "13:30", team1: "SA", team2: "CAN", venue: "Ahmedabad", stage: "Group" },
 
@@ -28,7 +28,7 @@ const fixtures = [
   { date: "2026-02-13", time: "7:00 PM", timeGMT: "13:30", team1: "USA", team2: "NED", venue: "Chennai", stage: "Group" },
 
   { date: "2026-02-14", time: "11:00 AM", timeGMT: "05:30", team1: "IRE", team2: "OMA", venue: "SSC, Colombo", stage: "Group" },
-  { date: "2026-02-14", time: "3:00 PM", timeGMT: "09:30", team1: "ENG", team2: "BAN", venue: "Kolkata", stage: "Group" },
+  { date: "2026-02-14", time: "3:00 PM", timeGMT: "09:30", team1: "ENG", team2: "SCO", venue: "Kolkata", stage: "Group" },
   { date: "2026-02-14", time: "7:00 PM", timeGMT: "13:30", team1: "NZ", team2: "SA", venue: "Ahmedabad", stage: "Group" },
 
   { date: "2026-02-15", time: "11:00 AM", timeGMT: "05:30", team1: "WI", team2: "NEP", venue: "Mumbai", stage: "Group" },
@@ -41,7 +41,7 @@ const fixtures = [
 
   { date: "2026-02-17", time: "11:00 AM", timeGMT: "05:30", team1: "NZ", team2: "CAN", venue: "Chennai", stage: "Group" },
   { date: "2026-02-17", time: "3:00 PM", timeGMT: "09:30", team1: "IRE", team2: "ZIM", venue: "Kandy", stage: "Group" },
-  { date: "2026-02-17", time: "7:00 PM", timeGMT: "13:30", team1: "BAN", team2: "NEP", venue: "Mumbai", stage: "Group" },
+  { date: "2026-02-17", time: "7:00 PM", timeGMT: "13:30", team1: "SCO", team2: "NEP", venue: "Mumbai", stage: "Group" },
 
   { date: "2026-02-18", time: "11:00 AM", timeGMT: "05:30", team1: "SA", team2: "UAE", venue: "Delhi", stage: "Group" },
   { date: "2026-02-18", time: "3:00 PM", timeGMT: "09:30", team1: "PAK", team2: "NAM", venue: "SSC, Colombo", stage: "Group" },
