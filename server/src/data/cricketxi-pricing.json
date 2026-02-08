@@ -1,0 +1,1770 @@
+{
+    "current_round": 2535,
+    "teams": {
+        "35": {
+            "abv": "NZ",
+            "colours": {
+                "dark": "#616169"
+            },
+            "name": "New Zealand",
+            "shirt": null,
+            "id": 35
+        },
+        "33": {
+            "abv": "Ire",
+            "colours": {
+                "dark": "#3A752E"
+            },
+            "name": "Ireland",
+            "shirt": null,
+            "id": 33
+        },
+        "32": {
+            "abv": "Neth",
+            "colours": {
+                "dark": "#EF6D2B"
+            },
+            "name": "Netherlands",
+            "shirt": null,
+            "id": 32
+        },
+        "21": {
+            "abv": "Eng",
+            "colours": {
+                "dark": "#D23F31"
+            },
+            "name": "England",
+            "shirt": null,
+            "id": 21
+        },
+        "26": {
+            "abv": "SA",
+            "colours": {
+                "dark": "#3C7A3C"
+            },
+            "name": "South Africa",
+            "shirt": null,
+            "id": 26
+        },
+        "17": {
+            "abv": "Afgh",
+            "colours": {
+                "dark": "#8B7031"
+            },
+            "name": "Afghanistan",
+            "shirt": null,
+            "id": 17
+        },
+        "461": {
+            "abv": "ITA",
+            "colours": {
+                "dark": "#0040CD"
+            },
+            "name": "Italy",
+            "shirt": null,
+            "id": 461
+        },
+        "30": {
+            "abv": "Scot",
+            "colours": {
+                "dark": "#391B4F"
+            },
+            "name": "Scotland",
+            "shirt": null,
+            "id": 30
+        },
+        "23": {
+            "abv": "Aus",
+            "colours": {
+                "dark": "#FBC031"
+            },
+            "name": "Australia",
+            "shirt": null,
+            "id": 23
+        },
+        "65": {
+            "abv": "UAE",
+            "colours": {
+                "dark": "#8A2614"
+            },
+            "name": "United Arab Emirates",
+            "shirt": null,
+            "id": 65
+        },
+        "29": {
+            "abv": "Zim",
+            "colours": {
+                "dark": "#D23F31"
+            },
+            "name": "Zimbabwe",
+            "shirt": null,
+            "id": 29
+        },
+        "25": {
+            "abv": "SL",
+            "colours": {
+                "dark": "#162A5E"
+            },
+            "name": "Sri Lanka",
+            "shirt": null,
+            "id": 25
+        },
+        "36": {
+            "abv": "Pak",
+            "colours": {
+                "dark": "#AD861E"
+            },
+            "name": "Pakistan",
+            "shirt": null,
+            "id": 36
+        },
+        "108": {
+            "abv": "Nep",
+            "colours": {
+                "dark": "#DD213C"
+            },
+            "name": "Nepal",
+            "shirt": null,
+            "id": 108
+        },
+        "137": {
+            "abv": "Can",
+            "colours": {
+                "dark": "#C13538"
+            },
+            "name": "Canada",
+            "shirt": null,
+            "id": 137
+        },
+        "34": {
+            "abv": "Oman",
+            "colours": {
+                "dark": "#AF1902"
+            },
+            "name": "Oman",
+            "shirt": null,
+            "id": 34
+        },
+        "66": {
+            "abv": "Nam",
+            "colours": {
+                "dark": "#962A17"
+            },
+            "name": "Namibia",
+            "shirt": null,
+            "id": 66
+        },
+        "37": {
+            "abv": "WI",
+            "colours": {
+                "dark": "#7A2119"
+            },
+            "name": "West Indies",
+            "shirt": null,
+            "id": 37
+        },
+        "340": {
+            "abv": "USA",
+            "colours": {
+                "dark": "#243E99"
+            },
+            "name": "United States of America",
+            "shirt": null,
+            "id": 340
+        },
+        "19": {
+            "abv": "Ind",
+            "colours": {
+                "dark": "#2255A4"
+            },
+            "name": "India",
+            "shirt": null,
+            "id": 19
+        }
+    },
+    "players": [
+        {
+            "shortname": "S Yadav",
+            "played": 1,
+            "bye": 0,
+            "position": "BAT",
+            "round_scores": {
+                "2535": 206
+            },
+            "points": 206,
+            "last_round_score": null,
+            "last_name": "Yadav",
+            "url": "suryakumar-yadav-464",
+            "player_id": 464,
+            "id": 52838,
+            "scores": {
+                "11508": 206
+            },
+            "locked": 1,
+            "last_3_avg": 206.0,
+            "avg": "206.00",
+            "stats": {
+                "points": {
+                    "batting": 100,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52838
+                }
+            ],
+            "highest_score": 206,
+            "fullname": "Suryakumar Yadav",
+            "full_position": "Batter",
+            "price": 82000,
+            "lowest_score": 206,
+            "selected": "22",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Suryakumar"
+        },
+        {
+            "shortname": "A Sharma",
+            "played": 1,
+            "bye": 0,
+            "position": "BAT",
+            "round_scores": {
+                "2535": -20
+            },
+            "points": -20,
+            "last_round_score": null,
+            "last_name": "Sharma",
+            "url": "abhishek-sharma-1904",
+            "player_id": 1904,
+            "id": 52839,
+            "scores": {
+                "11508": -20
+            },
+            "locked": 1,
+            "last_3_avg": -20.0,
+            "avg": "-20.00",
+            "stats": {
+                "points": {
+                    "batting": -2000,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52839
+                }
+            ],
+            "highest_score": -20,
+            "fullname": "Abhishek Sharma",
+            "full_position": "Batter",
+            "price": 111000,
+            "lowest_score": -20,
+            "selected": "45",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Abhishek"
+        },
+        {
+            "shortname": "T Varma",
+            "played": 1,
+            "bye": 0,
+            "position": "BAT",
+            "round_scores": {
+                "2535": 84
+            },
+            "points": 84,
+            "last_round_score": null,
+            "last_name": "Varma",
+            "url": "tilak-varma-3297",
+            "player_id": 3297,
+            "id": 52840,
+            "scores": {
+                "11508": 84
+            },
+            "locked": 1,
+            "last_3_avg": 84.0,
+            "avg": "84.00",
+            "stats": {
+                "points": {
+                    "batting": 64,
+                    "bowling": 0,
+                    "fielding": 36
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52840
+                }
+            ],
+            "highest_score": 84,
+            "fullname": "Tilak Varma",
+            "full_position": "Batter",
+            "price": 81000,
+            "lowest_score": 84,
+            "selected": "8",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Tilak"
+        },
+        {
+            "shortname": "S Samson",
+            "played": 0,
+            "bye": 0,
+            "position": "WK",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Samson",
+            "url": "sanju-samson-478",
+            "player_id": 478,
+            "id": 52841,
+            "scores": {},
+            "locked": 1,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Not Selected",
+                    "img": "notselected.svg",
+                    "id": 52841
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Sanju Samson",
+            "full_position": "Wicketkeeper",
+            "price": 84000,
+            "lowest_score": "N/A",
+            "selected": "2",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Sanju"
+        },
+        {
+            "shortname": "S Dube",
+            "played": 1,
+            "bye": 0,
+            "position": "BAT",
+            "round_scores": {
+                "2535": -5
+            },
+            "points": -5,
+            "last_round_score": null,
+            "last_name": "Dube",
+            "url": "shivam-dube-2292",
+            "player_id": 2292,
+            "id": 52842,
+            "scores": {
+                "11508": -5
+            },
+            "locked": 1,
+            "last_3_avg": -5.0,
+            "avg": "-5.00",
+            "stats": {
+                "points": {
+                    "batting": -133,
+                    "bowling": 0,
+                    "fielding": 100
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52842
+                }
+            ],
+            "highest_score": -5,
+            "fullname": "Shivam Dube",
+            "full_position": "Batter",
+            "price": 52000,
+            "lowest_score": -5,
+            "selected": "4",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Shivam"
+        },
+        {
+            "shortname": "I Kishan",
+            "played": 1,
+            "bye": 0,
+            "position": "WK",
+            "round_scores": {
+                "2535": 55
+            },
+            "points": 55,
+            "last_round_score": null,
+            "last_name": "Kishan",
+            "url": "ishan-kishan-529",
+            "player_id": 529,
+            "id": 52843,
+            "scores": {
+                "11508": 55
+            },
+            "locked": 1,
+            "last_3_avg": 55.0,
+            "avg": "55.00",
+            "stats": {
+                "points": {
+                    "batting": 64,
+                    "bowling": 0,
+                    "fielding": 36
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52843
+                }
+            ],
+            "highest_score": 55,
+            "fullname": "Ishan Kishan",
+            "full_position": "Wicketkeeper",
+            "price": 74000,
+            "lowest_score": 55,
+            "selected": "27",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Ishan"
+        },
+        {
+            "shortname": "H Pandya",
+            "played": 1,
+            "bye": 0,
+            "position": "ALR",
+            "round_scores": {
+                "2535": 9
+            },
+            "points": 9,
+            "last_round_score": null,
+            "last_name": "Pandya",
+            "url": "hardik-pandya-258",
+            "player_id": 258,
+            "id": 52844,
+            "scores": {
+                "11508": 9
+            },
+            "locked": 1,
+            "last_3_avg": 9.0,
+            "avg": "9.00",
+            "stats": {
+                "points": {
+                    "batting": 67,
+                    "bowling": 33,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52844
+                }
+            ],
+            "highest_score": 9,
+            "fullname": "Hardik Pandya",
+            "full_position": "All-Rounder",
+            "price": 94000,
+            "lowest_score": 9,
+            "selected": "22",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Hardik"
+        },
+        {
+            "shortname": "A Singh",
+            "played": 1,
+            "bye": 0,
+            "position": "BOWL",
+            "round_scores": {
+                "2535": 105
+            },
+            "points": 105,
+            "last_round_score": null,
+            "last_name": "Singh",
+            "url": "arshdeep-singh-2281",
+            "player_id": 2281,
+            "id": 52845,
+            "scores": {
+                "11508": 105
+            },
+            "locked": 1,
+            "last_3_avg": 105.0,
+            "avg": "105.00",
+            "stats": {
+                "points": {
+                    "batting": 4,
+                    "bowling": 96,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52845
+                }
+            ],
+            "highest_score": 105,
+            "fullname": "Arshdeep Singh",
+            "full_position": "Bowler",
+            "price": 95000,
+            "lowest_score": 105,
+            "selected": "12",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Arshdeep"
+        },
+        {
+            "shortname": "J Bumrah",
+            "played": 0,
+            "bye": 0,
+            "position": "BOWL",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Bumrah",
+            "url": "jasprit-bumrah-250",
+            "player_id": 250,
+            "id": 52846,
+            "scores": {},
+            "locked": 1,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Not Selected",
+                    "img": "notselected.svg",
+                    "id": 52846
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Jasprit Bumrah",
+            "full_position": "Bowler",
+            "price": 120000,
+            "lowest_score": "N/A",
+            "selected": "16",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Jasprit"
+        },
+        {
+            "shortname": "H Rana",
+            "played": 0,
+            "bye": 0,
+            "position": "BOWL",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Rana",
+            "url": "harshit-rana-3381",
+            "player_id": 3381,
+            "id": 52847,
+            "scores": {},
+            "locked": 1,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Not Selected",
+                    "img": "notselected.svg",
+                    "id": 52847
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Harshit Rana",
+            "full_position": "Bowler",
+            "price": 65000,
+            "lowest_score": "N/A",
+            "selected": "4",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Harshit"
+        },
+        {
+            "shortname": "V Chakravarthy",
+            "played": 1,
+            "bye": 0,
+            "position": "BOWL",
+            "round_scores": {
+                "2535": 50
+            },
+            "points": 50,
+            "last_round_score": null,
+            "last_name": "Chakravarthy",
+            "url": "varun-chakravarthy-2276",
+            "player_id": 2276,
+            "id": 52848,
+            "scores": {
+                "11508": 50
+            },
+            "locked": 1,
+            "last_3_avg": 50.0,
+            "avg": "50.00",
+            "stats": {
+                "points": {
+                    "batting": -29,
+                    "bowling": 79,
+                    "fielding": 21
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52848
+                }
+            ],
+            "highest_score": 50,
+            "fullname": "Varun Chakravarthy",
+            "full_position": "Bowler",
+            "price": 79000,
+            "lowest_score": 50,
+            "selected": "31",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Varun"
+        },
+        {
+            "shortname": "K Yadav",
+            "played": 0,
+            "bye": 0,
+            "position": "BOWL",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Yadav",
+            "url": "kuldeep-yadav-456",
+            "player_id": 456,
+            "id": 52849,
+            "scores": {},
+            "locked": 1,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Not Selected",
+                    "img": "notselected.svg",
+                    "id": 52849
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Kuldeep Yadav",
+            "full_position": "Bowler",
+            "price": 63000,
+            "lowest_score": "N/A",
+            "selected": "14",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Kuldeep"
+        },
+        {
+            "shortname": "A Patel",
+            "played": 1,
+            "bye": 0,
+            "position": "ALR",
+            "round_scores": {
+                "2535": 105
+            },
+            "points": 105,
+            "last_round_score": null,
+            "last_name": "Patel",
+            "url": "axar-patel-502",
+            "player_id": 502,
+            "id": 52850,
+            "scores": {
+                "11508": 105
+            },
+            "locked": 1,
+            "last_3_avg": 105.0,
+            "avg": "105.00",
+            "stats": {
+                "points": {
+                    "batting": 21,
+                    "bowling": 79,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52850
+                }
+            ],
+            "highest_score": 105,
+            "fullname": "Axar Patel",
+            "full_position": "All-Rounder",
+            "price": 99000,
+            "lowest_score": 105,
+            "selected": "6",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Axar"
+        },
+        {
+            "shortname": "W Sundar",
+            "played": 0,
+            "bye": 0,
+            "position": "ALR",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Sundar",
+            "url": "washington-sundar-1373",
+            "player_id": 1373,
+            "id": 52851,
+            "scores": {},
+            "locked": 1,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Not Selected",
+                    "img": "notselected.svg",
+                    "id": 52851
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Washington Sundar",
+            "full_position": "All-Rounder",
+            "price": 91000,
+            "lowest_score": "N/A",
+            "selected": "1",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Washington"
+        },
+        {
+            "shortname": "R Singh",
+            "played": 1,
+            "bye": 0,
+            "position": "BAT",
+            "round_scores": {
+                "2535": 17
+            },
+            "points": 17,
+            "last_round_score": null,
+            "last_name": "Singh",
+            "url": "rinku-singh-1203",
+            "player_id": 1203,
+            "id": 52852,
+            "scores": {
+                "11508": 17
+            },
+            "locked": 1,
+            "last_3_avg": 17.0,
+            "avg": "17.00",
+            "stats": {
+                "points": {
+                    "batting": 12,
+                    "bowling": 0,
+                    "fielding": 88
+                }
+            },
+            "pending": 0,
+            "team_id": 19,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52852
+                }
+            ],
+            "highest_score": 17,
+            "fullname": "Rinku Singh",
+            "full_position": "Batter",
+            "price": 63000,
+            "lowest_score": 17,
+            "selected": "2",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Rinku"
+        },
+        {
+            "shortname": "G Erasmus",
+            "played": 0,
+            "bye": 1,
+            "position": "BAT",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Erasmus",
+            "url": "gerhard-erasmus-1037",
+            "player_id": 1037,
+            "id": 52853,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52853
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Gerhard Erasmus",
+            "full_position": "Batter",
+            "price": 80000,
+            "lowest_score": "N/A",
+            "selected": "1",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Gerhard"
+        },
+        {
+            "shortname": "Z Green",
+            "played": 0,
+            "bye": 1,
+            "position": "WK",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Green",
+            "url": "zane-green-1039",
+            "player_id": 1039,
+            "id": 52854,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52854
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Zane Green",
+            "full_position": "Wicketkeeper",
+            "price": 32000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Zane"
+        },
+        {
+            "shortname": "B Scholtz",
+            "played": 0,
+            "bye": 1,
+            "position": "BOWL",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Scholtz",
+            "url": "bernard-scholtz-1042",
+            "player_id": 1042,
+            "id": 52855,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52855
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Bernard Scholtz",
+            "full_position": "Bowler",
+            "price": 62000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Bernard"
+        },
+        {
+            "shortname": "R Trumpelmann",
+            "played": 0,
+            "bye": 1,
+            "position": "BOWL",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Trumpelmann",
+            "url": "ruben-trumpelmann-3053",
+            "player_id": 3053,
+            "id": 52856,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52856
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Ruben Trumpelmann",
+            "full_position": "Bowler",
+            "price": 56000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Ruben"
+        },
+        {
+            "shortname": "JJ Smit",
+            "played": 0,
+            "bye": 1,
+            "position": "ALR",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Smit",
+            "url": "jj-smit-1043",
+            "player_id": 1043,
+            "id": 52857,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52857
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "JJ Smit",
+            "full_position": "All-Rounder",
+            "price": 62000,
+            "lowest_score": "N/A",
+            "selected": "1",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "JJ"
+        },
+        {
+            "shortname": "J Frylinck",
+            "played": 0,
+            "bye": 1,
+            "position": "BOWL",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Frylinck",
+            "url": "jan-frylinck-1038",
+            "player_id": 1038,
+            "id": 52858,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52858
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Jan Frylinck",
+            "full_position": "Bowler",
+            "price": 76000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Jan"
+        },
+        {
+            "shortname": "M Kruger",
+            "played": 0,
+            "bye": 1,
+            "position": "BAT",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Kruger",
+            "url": "malan-kruger-6768",
+            "player_id": 6768,
+            "id": 52859,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52859
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Malan Kruger",
+            "full_position": "Batter",
+            "price": 20000,
+            "lowest_score": "N/A",
+            "selected": "1",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Malan"
+        },
+        {
+            "shortname": "J Brassell",
+            "played": 0,
+            "bye": 1,
+            "position": "BOWL",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Brassell",
+            "url": "jack-brassell-6163",
+            "player_id": 6163,
+            "id": 52860,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52860
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Jack Brassell",
+            "full_position": "Bowler",
+            "price": 35000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Jack"
+        },
+        {
+            "shortname": "B Shikongo",
+            "played": 0,
+            "bye": 1,
+            "position": "BOWL",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Shikongo",
+            "url": "ben-shikongo-2461",
+            "player_id": 2461,
+            "id": 52861,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52861
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Ben Shikongo",
+            "full_position": "Bowler",
+            "price": 25000,
+            "lowest_score": "N/A",
+            "selected": "1",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Ben"
+        },
+        {
+            "shortname": "D Leicher",
+            "played": 0,
+            "bye": 1,
+            "position": "ALR",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Leicher",
+            "url": "dylan-leicher-6769",
+            "player_id": 6769,
+            "id": 52862,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52862
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Dylan Leicher",
+            "full_position": "All-Rounder",
+            "price": 20000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Dylan"
+        },
+        {
+            "shortname": "L Steenkamp",
+            "played": 0,
+            "bye": 1,
+            "position": "BAT",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Steenkamp",
+            "url": "louren-steenkamp-7951",
+            "player_id": 7951,
+            "id": 52863,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52863
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Louren Steenkamp",
+            "full_position": "Batter",
+            "price": 38000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Louren"
+        },
+        {
+            "shortname": "M Heingo",
+            "played": 0,
+            "bye": 1,
+            "position": "BOWL",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Heingo",
+            "url": "max-heingo-7952",
+            "player_id": 7952,
+            "id": 52864,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52864
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Max Heingo",
+            "full_position": "Bowler",
+            "price": 20000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Max"
+        },
+        {
+            "shortname": "J Loftie-Eaton",
+            "played": 0,
+            "bye": 1,
+            "position": "BAT",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Loftie-Eaton",
+            "url": "jan-loftieeaton-3052",
+            "player_id": 3052,
+            "id": 52865,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52865
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Jan Loftie-Eaton",
+            "full_position": "Batter",
+            "price": 34000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Jan"
+        },
+        {
+            "shortname": "J Balt",
+            "played": 0,
+            "bye": 1,
+            "position": "BAT",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Balt",
+            "url": "jan-balt-7953",
+            "player_id": 7953,
+            "id": 52866,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52866
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Jan Balt",
+            "full_position": "Batter",
+            "price": 26000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Jan"
+        },
+        {
+            "shortname": "W Myburgh",
+            "played": 0,
+            "bye": 1,
+            "position": "ALR",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Myburgh",
+            "url": "willem-myburgh-7954",
+            "player_id": 7954,
+            "id": 52867,
+            "scores": {},
+            "locked": 0,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 66,
+            "notes": [
+                {
+                    "text": "Bye",
+                    "img": "bye.svg",
+                    "id": 52867
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Willem Myburgh",
+            "full_position": "All-Rounder",
+            "price": 20000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Willem"
+        },
+        {
+            "shortname": "S Edwards",
+            "played": 1,
+            "bye": 0,
+            "position": "WK",
+            "round_scores": {
+                "2535": 94
+            },
+            "points": 94,
+            "last_round_score": null,
+            "last_name": "Edwards",
+            "url": "scott-edwards-1837",
+            "player_id": 1837,
+            "id": 52868,
+            "scores": {
+                "11506": 94
+            },
+            "locked": 1,
+            "last_3_avg": 94.0,
+            "avg": "94.00",
+            "stats": {
+                "points": {
+                    "batting": 68,
+                    "bowling": 0,
+                    "fielding": 32
+                }
+            },
+            "pending": 0,
+            "team_id": 32,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52868
+                }
+            ],
+            "highest_score": 94,
+            "fullname": "Scott Edwards",
+            "full_position": "Wicketkeeper",
+            "price": 62000,
+            "lowest_score": 94,
+            "selected": "1",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Scott"
+        },
+        {
+            "shortname": "C Ackermann",
+            "played": 1,
+            "bye": 0,
+            "position": "ALR",
+            "round_scores": {
+                "2535": 36
+            },
+            "points": 36,
+            "last_round_score": null,
+            "last_name": "Ackermann",
+            "url": "colin-ackermann-1181",
+            "player_id": 1181,
+            "id": 52869,
+            "scores": {
+                "11506": 36
+            },
+            "locked": 1,
+            "last_3_avg": 36.0,
+            "avg": "36.00",
+            "stats": {
+                "points": {
+                    "batting": 100,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 32,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52869
+                }
+            ],
+            "highest_score": 36,
+            "fullname": "Colin Ackermann",
+            "full_position": "All-Rounder",
+            "price": 74000,
+            "lowest_score": 36,
+            "selected": "2",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Colin"
+        },
+        {
+            "shortname": "N Croes",
+            "played": 0,
+            "bye": 0,
+            "position": "WK",
+            "round_scores": {},
+            "points": 0,
+            "last_round_score": null,
+            "last_name": "Croes",
+            "url": "noah-croes-5412",
+            "player_id": 5412,
+            "id": 52870,
+            "scores": {},
+            "locked": 1,
+            "last_3_avg": 0.0,
+            "avg": 0,
+            "stats": {
+                "points": {
+                    "batting": 0,
+                    "bowling": 0,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 32,
+            "notes": [
+                {
+                    "text": "Not Selected",
+                    "img": "notselected.svg",
+                    "id": 52870
+                }
+            ],
+            "highest_score": "N/A",
+            "fullname": "Noah Croes",
+            "full_position": "Wicketkeeper",
+            "price": 20000,
+            "lowest_score": "N/A",
+            "selected": 0,
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Noah"
+        },
+        {
+            "shortname": "B de Leede",
+            "played": 1,
+            "bye": 0,
+            "position": "ALR",
+            "round_scores": {
+                "2535": 50
+            },
+            "points": 50,
+            "last_round_score": null,
+            "last_name": "de Leede",
+            "url": "bas-de-leede-1836",
+            "player_id": 1836,
+            "id": 52871,
+            "scores": {
+                "11506": 50
+            },
+            "locked": 1,
+            "last_3_avg": 50.0,
+            "avg": "50.00",
+            "stats": {
+                "points": {
+                    "batting": 98,
+                    "bowling": 2,
+                    "fielding": 0
+                }
+            },
+            "pending": 0,
+            "team_id": 32,
+            "notes": [
+                {
+                    "text": "Playing",
+                    "img": "selected.svg",
+                    "id": 52871
+                }
+            ],
+            "highest_score": 50,
+            "fullname": "Bas de Leede",
+            "full_position": "All-Rounder",
+            "price": 80000,
+            "lowest_score": 50,
+            "selected": "4",
+            "prices": {
+                "round_change": null,
+                "season_change": 0,
+                "round": null
+            },
+            "first_name": "Bas"
+        }
+    ],
+    "last_round": 0
+}

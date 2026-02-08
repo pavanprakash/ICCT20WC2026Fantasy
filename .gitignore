@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# env files
+.env
+.env.*
+
+# build outputs
+dist/
+build/
+coverage/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+
+# Vite
+.vite/
+
+# misc
+*.local
+.eslintcache
+.parcel-cache/
+.cache/
+.idea/
+.vscode/
+*.log
+*.tmp
