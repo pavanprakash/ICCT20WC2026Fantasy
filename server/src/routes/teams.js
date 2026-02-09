@@ -27,6 +27,24 @@ function normalizeName(value) {
     .trim();
 }
 
+function totalWithCaptaincy(points, captainName, viceName) {
+  let total = 0;
+  const capKey = normalizeName(captainName);
+  const vcKey = normalizeName(viceName);
+  for (const p of points) {
+    const nameKey = normalizeName(p.name);
+    const base = Number(p.total || 0);
+    if (capKey && nameKey === capKey) {
+      total += base * 2;
+    } else if (vcKey && nameKey === vcKey) {
+      total += base * 1.5;
+    } else {
+      total += base;
+    }
+  }
+  return total;
+}
+
 async function teamPointsSince(team) {
   const players = team?.players || [];
   if (!players.length) return 0;
@@ -46,11 +64,8 @@ async function teamPointsSince(team) {
   let total = 0;
   for (const doc of docs) {
     const points = Array.isArray(doc.points) ? doc.points : [];
-    for (const p of points) {
-      if (nameSet.has(normalizeName(p.name))) {
-        total += Number(p.total || 0);
-      }
-    }
+    const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
+    total += totalWithCaptaincy(filtered, team?.captain?.name, team?.viceCaptain?.name);
   }
   return total;
 }
@@ -176,7 +191,12 @@ function getTransferPhase() {
 }
 
 router.get("/leaderboard", async (req, res) => {
-  const teams = await Team.find().populate("user", "name email").populate("players").lean();
+  const teams = await Team.find()
+    .populate("user", "name email")
+    .populate("players")
+    .populate("captain")
+    .populate("viceCaptain")
+    .lean();
   const visible = teams.filter((t) => t.user);
   const rankedRaw = await Promise.all(
     visible.map(async (t) => ({

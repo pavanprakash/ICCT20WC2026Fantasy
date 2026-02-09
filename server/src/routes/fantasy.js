@@ -16,6 +16,24 @@ function normalizeName(value) {
     .trim();
 }
 
+function totalWithCaptaincy(points, captainName, viceName) {
+  let total = 0;
+  const capKey = normalizeName(captainName);
+  const vcKey = normalizeName(viceName);
+  for (const p of points) {
+    const nameKey = normalizeName(p.name);
+    const base = Number(p.total || 0);
+    if (capKey && nameKey === capKey) {
+      total += base * 2;
+    } else if (vcKey && nameKey === vcKey) {
+      total += base * 1.5;
+    } else {
+      total += base;
+    }
+  }
+  return total;
+}
+
 function isCompletedMatch(match) {
   const ms = String(match?.ms || "").toLowerCase();
   if (ms === "result") return true;
@@ -229,8 +247,13 @@ router.post("/points/since", authRequired, async (req, res) => {
   try {
     const { playerIds = [], since } = req.body || {};
     let startMs = Number(since);
+    const team = await Team.findOne({ user: req.user.id })
+      .select("submittedForMatchStart players captain viceCaptain")
+      .populate("players")
+      .populate("captain")
+      .populate("viceCaptain")
+      .lean();
     if (!Number.isFinite(startMs)) {
-      const team = await Team.findOne({ user: req.user.id }).select("submittedForMatchStart players").populate("players").lean();
       if (team?.submittedForMatchStart) {
         startMs = new Date(team.submittedForMatchStart).getTime();
       }
@@ -249,6 +272,8 @@ router.post("/points/since", authRequired, async (req, res) => {
 
     const players = await Player.find({ _id: { $in: ids } }).lean();
     const nameSet = new Set(players.map((p) => normalizeName(p.name)));
+    const captainName = team?.captain?.name || null;
+    const viceName = team?.viceCaptain?.name || null;
 
     const docs = await FantasyMatchPoints.find({
       $or: [
@@ -260,11 +285,8 @@ router.post("/points/since", authRequired, async (req, res) => {
     let total = 0;
     for (const doc of docs) {
       const points = Array.isArray(doc.points) ? doc.points : [];
-      for (const p of points) {
-        if (nameSet.has(normalizeName(p.name))) {
-          total += Number(p.total || 0);
-        }
-      }
+      const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
+      total += totalWithCaptaincy(filtered, captainName, viceName);
     }
 
     res.json({ since: startMs, totalPoints: total, matches: docs.length });
