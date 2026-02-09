@@ -11,8 +11,10 @@ export default function Leaderboard() {
     Promise.all([api.get("/teams/leaderboard"), api.get("/leagues/mine/standings")])
       .then(([leaderboardRes, leaguesRes]) => {
         if (!mounted) return;
-        setRows(leaderboardRes.data);
-        setLeagueStandings(leaguesRes.data || []);
+        const rowsData = Array.isArray(leaderboardRes.data) ? leaderboardRes.data : [];
+        const leagueData = Array.isArray(leaguesRes.data) ? leaguesRes.data : [];
+        setRows(rowsData);
+        setLeagueStandings(leagueData);
         setLoading(false);
       })
       .catch(() => {

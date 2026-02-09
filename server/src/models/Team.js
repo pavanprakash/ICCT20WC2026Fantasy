@@ -15,6 +15,8 @@ const TeamSchema = new mongoose.Schema(
     postGroupResetDone: { type: Boolean, default: false },
     lastSubmissionDate: { type: String },
     submittedForDate: { type: String },
+    submittedForMatchId: { type: String },
+    submittedForMatchStart: { type: Date },
     submittedAt: { type: Date }
   },
   { timestamps: true }

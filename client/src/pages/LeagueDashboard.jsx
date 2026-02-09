@@ -36,7 +36,10 @@ export default function LeagueDashboard() {
       <div className="page__header">
         <h2>League Dashboard</h2>
         {league ? (
-          <p>{league.name} · Code {league.code}</p>
+          <p>
+            {league.name} · Code {league.code}
+            {Number.isFinite(league.membersCount) ? ` · ${league.membersCount} members` : ""}
+          </p>
         ) : (
           <p>Loading league details...</p>
         )}

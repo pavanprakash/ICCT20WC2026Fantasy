@@ -12,8 +12,26 @@ import Fixtures from "./pages/Fixtures.jsx";
 import Rules from "./pages/Rules.jsx";
 
 function Navbar({ user, onLogout }) {
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
   return (
     <header className="nav">
+      <button
+        className="nav__burger"
+        type="button"
+        aria-label={menuOpen ? "Close menu" : "Open menu"}
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((prev) => !prev)}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
       <div className="brand">
         <span className="brand__tag">ICC 2026</span>
         <Link to="/" className="brand__title">
@@ -40,6 +58,50 @@ function Navbar({ user, onLogout }) {
             Login
           </Link>
         )}
+      </div>
+      <div className={`nav-drawer ${menuOpen ? "nav-drawer--open" : ""}`} role="dialog">
+        <div
+          className={`nav-drawer__overlay ${menuOpen ? "nav-drawer__overlay--show" : ""}`}
+          onClick={() => setMenuOpen(false)}
+          aria-hidden="true"
+        />
+        <div className="nav-drawer__panel">
+          <div className="nav-drawer__header">
+            <div className="brand">
+              <span className="brand__tag">ICC 2026</span>
+              <span className="brand__title">Menu</span>
+            </div>
+            <button
+              className="nav-drawer__close"
+              type="button"
+              aria-label="Close menu"
+              onClick={() => setMenuOpen(false)}
+            >
+              ×
+            </button>
+          </div>
+          <nav className="nav-drawer__links">
+            <Link to="/fixtures">Fixtures</Link>
+            <Link to="/rules">Rules</Link>
+            <Link to="/team">Create Team</Link>
+            <Link to="/leaderboard">Leaderboard</Link>
+            <Link to="/league">Create League</Link>
+          </nav>
+          <div className="nav-drawer__auth">
+            {user ? (
+              <>
+                <div className="nav__user">{user.name}</div>
+                <button className="btn btn--ghost" onClick={onLogout}>
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link className="btn btn--ghost" to="/auth">
+                Login
+              </Link>
+            )}
+          </div>
+        </div>
       </div>
     </header>
   );
@@ -115,7 +177,7 @@ export default function App() {
       </main>
       <footer className="footer">
         <div>
-          Built for ICC World Cup 2026 Fantasy. Local demo only.
+          Built for ICC World Cup 2026 Fantasy.
         </div>
       </footer>
     </div>

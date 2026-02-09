@@ -47,7 +47,10 @@ const PlayerChip = ({ player, isCaptain, isViceCaptain, canEdit, onRemove }) => 
     </div>
     <div className="player-chip__meta">
       <div className="player-chip__name">{player.name}</div>
-      <div className="player-chip__price">{formatPrice(player.price)} Cr</div>
+      <div className="player-chip__details">
+        <span className="player-chip__country">{player.country || "—"}</span>
+        <span className="player-chip__price">{formatPrice(player.price)} Cr</span>
+      </div>
     </div>
     {canEdit && (
       <button

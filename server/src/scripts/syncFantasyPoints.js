@@ -10,7 +10,8 @@ dotenv.config();
 
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
 const SERIES_KEY = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
-const SCORECARD_KEY = process.env.CRICAPI_SCORECARD_KEY || process.env.CRICAPI_KEY;
+// Use the same key for scorecards to avoid mismatched API permissions.
+const SCORECARD_KEY = SERIES_KEY;
 
 function normalizeName(value) {
   return String(value || "")
@@ -41,6 +42,13 @@ function matchDateFromMatch(match) {
   return iso.slice(0, 10);
 }
 
+function matchStartMsFromMatch(match) {
+  const dt = match?.dateTimeGMT || match?.dateTime;
+  if (!dt) return null;
+  const ms = new Date(dt).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 function isT20WorldCup2026(match) {
   const seriesId = String(match?.series_id || match?.seriesId || "");
   if (seriesId && seriesId === SERIES_ID) return true;
@@ -64,14 +72,34 @@ async function run() {
   await ensureRules();
   const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
 
-  const seriesInfo = await cricapiGet("/series_info", { id: SERIES_ID }, SERIES_KEY);
-  const rawMatches =
-    seriesInfo?.data?.matchList ||
-    seriesInfo?.data?.matches ||
-    seriesInfo?.data?.match ||
-    [];
-  const list = Array.isArray(rawMatches) ? rawMatches : [];
-  const matches = list.filter(isT20WorldCup2026);
+  const matches = [];
+  // currentMatches is paginated via offset; fetch until empty or safety cap.
+  const PAGE_SIZE = 25;
+  const MAX_PAGES = 20;
+  const debug = String(process.env.DEBUG_SYNC || "").toLowerCase() === "true";
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const offset = page * PAGE_SIZE;
+    const current = await cricapiGet("/currentMatches", { offset }, SERIES_KEY);
+    const list = Array.isArray(current?.data) ? current.data : [];
+    if (!list.length) break;
+    for (const m of list) {
+      const seriesId = String(m?.series_id || m?.seriesId || "");
+      if (seriesId === SERIES_ID) matches.push(m);
+    }
+    if (list.length < PAGE_SIZE) break;
+  }
+  if (debug) {
+    const ended = matches.filter((m) => m?.matchEnded === true).length;
+    const seriesIds = matches.slice(0, 5).map((m) => m?.series_id || m?.seriesId);
+    console.log(
+      JSON.stringify({
+        debug: true,
+        matchesTotal: matches.length,
+        matchesEnded: ended,
+        sampleSeriesIds: seriesIds
+      })
+    );
+  }
 
   const aggregate = new Map();
   let processed = 0;
@@ -81,20 +109,46 @@ async function run() {
     if (!matchId) continue;
     const scoreData = await cricapiGet("/match_scorecard", { id: matchId }, SCORECARD_KEY);
     const scoreRoot = scoreData?.data;
-    if (!isCompletedMatch(match) && !isCompletedScorecard(scoreRoot)) {
+    if (match?.matchEnded !== true && !isCompletedMatch(match) && !isCompletedScorecard(scoreRoot)) {
       continue;
     }
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
     const points = calculateMatchPoints(scorecard, rules);
     if (!points.length) {
+      if (debug) {
+        const topKeys = scoreData && typeof scoreData === "object" ? Object.keys(scoreData).slice(0, 20) : [];
+        const dataKeys = scoreRoot && typeof scoreRoot === "object" ? Object.keys(scoreRoot).slice(0, 20) : [];
+        const status = scoreData?.status || scoreRoot?.status || scoreRoot?.matchStatus || null;
+        const message = scoreData?.message || scoreRoot?.message || null;
+        const reason = scoreData?.reason || null;
+        const rootKeys = scoreRoot && typeof scoreRoot === "object" ? Object.keys(scoreRoot).slice(0, 20) : [];
+        const inningsArr = Array.isArray(scoreRoot?.innings) ? scoreRoot.innings : null;
+        const scorecardArr = Array.isArray(scoreRoot?.scorecard) ? scoreRoot.scorecard : null;
+        console.log(
+          JSON.stringify({
+            debug: true,
+            matchId,
+            message: "No points computed",
+            apiStatus: status,
+            apiMessage: message,
+            apiReason: reason,
+            topKeys,
+            dataKeys,
+            rootKeys,
+            inningsLength: inningsArr ? inningsArr.length : null,
+            scorecardLength: scorecardArr ? scorecardArr.length : null
+          })
+        );
+      }
       continue;
     }
     processed += 1;
 
     const matchDate = matchDateFromMatch(match);
+    const matchStartMs = matchStartMsFromMatch(match);
     await FantasyMatchPoints.findOneAndUpdate(
       { matchId: matchId, ruleset: rules.name },
-      { matchId: matchId, matchDate, ruleset: rules.name, points },
+      { matchId: matchId, matchDate, matchStartMs, ruleset: rules.name, points },
       { upsert: true, new: true }
     );
 

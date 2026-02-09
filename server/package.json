@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "seed": "node src/seed.js",
     "apply:pricing": "node src/scripts/applyPricing.js",
-    "sync:fantasy": "node src/scripts/syncFantasyPoints.js"
+    "sync:fantasy": "node src/scripts/syncFantasyPoints.js",
+    "reset:password": "node src/scripts/resetPassword.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

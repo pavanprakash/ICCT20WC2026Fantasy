@@ -38,6 +38,13 @@ function matchDateFromMatch(match) {
   return iso.slice(0, 10);
 }
 
+function matchStartMsFromMatch(match) {
+  const dt = match?.dateTimeGMT || match?.dateTime;
+  if (!dt) return null;
+  const ms = new Date(dt).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 function isT20WorldCup2026(match) {
   const seriesId = String(match?.series_id || match?.seriesId || "");
   const expected = String(process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510");
@@ -150,9 +157,10 @@ router.post("/sync", async (req, res) => {
       processed += 1;
 
       const matchDate = matchDateFromMatch(match);
+      const matchStartMs = matchStartMsFromMatch(match);
       await FantasyMatchPoints.findOneAndUpdate(
         { matchId: matchId, ruleset: rules.name },
-        { matchId: matchId, matchDate, ruleset: rules.name, points },
+        { matchId: matchId, matchDate, matchStartMs, ruleset: rules.name, points },
         { upsert: true, new: true }
       );
 
@@ -212,6 +220,54 @@ router.get("/daily", authRequired, async (req, res) => {
     }
 
     res.json({ date, totalPoints: total, matches: docs.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/points/since", authRequired, async (req, res) => {
+  try {
+    const { playerIds = [], since } = req.body || {};
+    let startMs = Number(since);
+    if (!Number.isFinite(startMs)) {
+      const team = await Team.findOne({ user: req.user.id }).select("submittedForMatchStart players").populate("players").lean();
+      if (team?.submittedForMatchStart) {
+        startMs = new Date(team.submittedForMatchStart).getTime();
+      }
+      if (!Number.isFinite(startMs)) {
+        return res.json({ since: null, totalPoints: 0, matches: 0 });
+      }
+      if (!playerIds.length && Array.isArray(team?.players)) {
+        req.body.playerIds = team.players.map((p) => p._id);
+      }
+    }
+
+    const ids = Array.isArray(req.body.playerIds) ? req.body.playerIds : [];
+    if (!ids.length) {
+      return res.json({ since: startMs, totalPoints: 0, matches: 0 });
+    }
+
+    const players = await Player.find({ _id: { $in: ids } }).lean();
+    const nameSet = new Set(players.map((p) => normalizeName(p.name)));
+
+    const docs = await FantasyMatchPoints.find({
+      $or: [
+        { matchStartMs: { $gt: startMs } },
+        { matchStartMs: { $exists: false }, matchDate: { $gte: new Date(startMs).toISOString().slice(0, 10) } }
+      ]
+    }).lean();
+
+    let total = 0;
+    for (const doc of docs) {
+      const points = Array.isArray(doc.points) ? doc.points : [];
+      for (const p of points) {
+        if (nameSet.has(normalizeName(p.name))) {
+          total += Number(p.total || 0);
+        }
+      }
+    }
+
+    res.json({ since: startMs, totalPoints: total, matches: docs.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

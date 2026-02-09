@@ -3,9 +3,12 @@ import { cricapiGet } from "../services/cricapi.js";
 
 const router = express.Router();
 
-const normalize = (value) => String(value || "").toLowerCase();
+const normalize = (value) => String(value || "").toLowerCase().trim();
+const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
 
 const isTargetMatch = (match) => {
+  const seriesId = String(match?.series_id || match?.seriesId || "");
+  if (seriesId && seriesId === SERIES_ID) return true;
   const hay = [
     match?.name,
     match?.series,
@@ -27,6 +30,9 @@ const isTargetMatch = (match) => {
 };
 
 const parseTeams = (match) => {
+  if (match?.t1 || match?.t2) {
+    return { team1: match?.t1 || "TBD", team2: match?.t2 || "TBD" };
+  }
   if (Array.isArray(match?.teams) && match.teams.length >= 2) {
     return { team1: match.teams[0], team2: match.teams[1] };
   }
@@ -61,11 +67,24 @@ const getStatusLabel = (match) => {
 
 router.get("/", async (req, res) => {
   try {
-    const data = await cricapiGet("/matches", req.query);
+    const key = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
+    const data = await cricapiGet("/cricScore", req.query, key);
     const list = Array.isArray(data?.data) ? data.data : [];
+    if (req.query?.debug) {
+      return res.json({
+        sampleSeries: list.slice(0, 5).map((m) => m?.series || m?.seriesName || null),
+        sampleMs: list.slice(0, 5).map((m) => m?.ms || m?.matchStatus || m?.status || null),
+        sampleIds: list.slice(0, 5).map((m) => m?.id || null),
+        total: list.length
+      });
+    }
 
     const matches = list
-      .filter(isTargetMatch)
+      .filter((match) => normalize(match?.series || match?.seriesName) === "icc men's t20 world cup 2026")
+      .filter((match) => {
+        const ms = normalize(match?.ms || match?.matchStatus || match?.status);
+        return ms === "fixture" || ms === "scheduled" || ms === "upcoming";
+      })
       .map((match) => {
         const teams = parseTeams(match);
         const gmt = toGmt(match);

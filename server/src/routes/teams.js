@@ -2,6 +2,7 @@ import express from "express";
 import Team from "../models/Team.js";
 import Player from "../models/Player.js";
 import League from "../models/League.js";
+import FantasyMatchPoints from "../models/FantasyMatchPoints.js";
 import fixtures from "../data/fixtures-2026.js";
 import { cricapiGet } from "../services/cricapi.js";
 import { authRequired } from "../middleware/auth.js";
@@ -19,6 +20,41 @@ function teamPoints(players) {
   return players.reduce((sum, p) => sum + calcPoints(p), 0);
 }
 
+function normalizeName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+async function teamPointsSince(team) {
+  const players = team?.players || [];
+  if (!players.length) return 0;
+  const startMs = team?.submittedForMatchStart
+    ? new Date(team.submittedForMatchStart).getTime()
+    : null;
+  if (!Number.isFinite(startMs)) {
+    return teamPoints(players);
+  }
+  const nameSet = new Set(players.map((p) => normalizeName(p.name)));
+  const docs = await FantasyMatchPoints.find({
+    $or: [
+      { matchStartMs: { $gt: startMs } },
+      { matchStartMs: { $exists: false }, matchDate: { $gte: new Date(startMs).toISOString().slice(0, 10) } }
+    ]
+  }).lean();
+  let total = 0;
+  for (const doc of docs) {
+    const points = Array.isArray(doc.points) ? doc.points : [];
+    for (const p of points) {
+      if (nameSet.has(normalizeName(p.name))) {
+        total += Number(p.total || 0);
+      }
+    }
+  }
+  return total;
+}
+
 function roundKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -30,7 +66,9 @@ function diffTransfers(oldIds, newIds) {
 
 const GROUP_LIMIT = 120;
 const FINAL_LIMIT = 45;
-const LOCK_GRACE_MINUTES = 4;
+const LOCK_BEFORE_SECONDS = 5;
+const LOCK_AFTER_MINUTES = 5;
+const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
 const ROLE_LIMITS = {
   bat: 5,
   bowl: 5,
@@ -38,10 +76,60 @@ const ROLE_LIMITS = {
   ar: 4
 };
 
+const normalize = (value) => String(value || "").toLowerCase();
+
 function parseUtc(dateStr, timeStr) {
   if (!dateStr || !timeStr) return null;
   const [h, m] = timeStr.split(":").map(Number);
-  return Date.UTC(Number(dateStr.slice(0, 4)), Number(dateStr.slice(5, 7)) - 1, Number(dateStr.slice(8, 10)), h, m);
+  return Date.UTC(
+    Number(dateStr.slice(0, 4)),
+    Number(dateStr.slice(5, 7)) - 1,
+    Number(dateStr.slice(8, 10)),
+    h,
+    m
+  );
+}
+
+function isTargetMatch(match) {
+  const seriesId = String(match?.series_id || match?.seriesId || "");
+  if (seriesId && seriesId === SERIES_ID) return true;
+  const seriesName = normalize(match?.series || match?.seriesName || "");
+  if (seriesName === "icc men's t20 world cup 2026") return true;
+  const hay = [
+    match?.name,
+    match?.series,
+    match?.seriesName,
+    match?.matchType,
+    match?.matchTypeLower,
+    match?.status
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const hasT20 = /t20/.test(normalize(hay));
+  const hasWC = /world cup/.test(normalize(hay));
+  const dateText = `${match?.dateTime || ""} ${match?.dateTimeGMT || ""} ${match?.date || ""}`;
+  const has2026 = /2026/.test(hay) || /2026/.test(dateText);
+  return hasT20 && hasWC && has2026;
+}
+
+function parseMatchStart(match) {
+  const dt = match?.dateTimeGMT || match?.dateTime;
+  if (!dt) return null;
+  const date = new Date(dt);
+  if (Number.isNaN(date.getTime())) return null;
+  const iso = date.toISOString();
+  return {
+    id:
+      match?.id ||
+      match?.match_id ||
+      match?.matchId ||
+      match?.unique_id ||
+      `${match?.series || match?.seriesName || "series"}-${dt}-${match?.name || "match"}`,
+    name: match?.name || null,
+    date: iso.slice(0, 10),
+    timeGMT: iso.slice(11, 16),
+    startMs: date.getTime()
+  };
 }
 
 function nextFixtureDateUtc() {
@@ -51,61 +139,28 @@ function nextFixtureDateUtc() {
   return unique[0] || today;
 }
 
-async function getTodayFirstStartUtc() {
-  try {
-    const data = await cricapiGet("/matches", {});
-    const list = Array.isArray(data?.data) ? data.data : [];
-    const today = new Date().toISOString().slice(0, 10);
-    const matches = list.filter((m) => {
-      const name = `${m?.name || ""} ${m?.series || ""} ${m?.seriesName || ""}`.toLowerCase();
-      return name.includes("t20") && name.includes("world cup") && name.includes("2026");
-    });
-    const todayMatches = matches.map((m) => {
-      const dt = m?.dateTimeGMT || m?.dateTime;
-      if (!dt) return null;
-      const iso = new Date(dt).toISOString();
-      const date = iso.slice(0, 10);
-      const time = iso.slice(11, 16);
-      return { date, time };
-    }).filter(Boolean).filter((m) => m.date == today);
-    const times = todayMatches.map((m) => parseUtc(m.date, m.time)).filter(Boolean);
-    if (times.length) return Math.min(...times);
-  } catch (e) {
-    // fall back to static fixtures data (no times)
-  }
-  return null;
+async function getSeriesMatches() {
+  const data = await cricapiGet("/cricScore", {});
+  const list = Array.isArray(data?.data) ? data.data : [];
+  return list
+    .filter(isTargetMatch)
+    .filter((m) => {
+      const ms = normalize(m?.ms || m?.matchStatus || m?.status || "");
+      return ms === "fixture" || ms === "scheduled" || ms === "upcoming";
+    })
+    .map(parseMatchStart)
+    .filter((m) => m && m.id && Number.isFinite(m.startMs))
+    .sort((a, b) => a.startMs - b.startMs);
 }
 
-async function getFirstStartForDateUtc(dateStr) {
-  try {
-    const data = await cricapiGet("/matches", {});
-    const list = Array.isArray(data?.data) ? data.data : [];
-    const matches = list.filter((m) => {
-      const name = `${m?.name || ""} ${m?.series || ""} ${m?.seriesName || ""}`.toLowerCase();
-      return name.includes("t20") && name.includes("world cup") && name.includes("2026");
-    });
-    const dateMatches = matches.map((m) => {
-      const dt = m?.dateTimeGMT || m?.dateTime;
-      if (!dt) return null;
-      const iso = new Date(dt).toISOString();
-      const date = iso.slice(0, 10);
-      const time = iso.slice(11, 16);
-      return { date, time };
-    }).filter(Boolean).filter((m) => m.date === dateStr);
-    const times = dateMatches.map((m) => parseUtc(m.date, m.time)).filter(Boolean);
-    if (times.length) return Math.min(...times);
-  } catch (e) {
-    // fall back to static fixtures (no times)
-  }
-  return null;
-}
-
-async function isSubmissionLockedNow() {
-  const firstStart = await getTodayFirstStartUtc();
-  if (!firstStart) return { locked: false, firstStart: null };
-  const now = Date.now();
-  const lockUntil = firstStart + LOCK_GRACE_MINUTES * 60 * 1000;
-  return { locked: now >= firstStart && now <= lockUntil, firstStart, lockUntil };
+function getSubmissionWindow(matches, now = Date.now()) {
+  const lockBeforeMs = LOCK_BEFORE_SECONDS * 1000;
+  const lockAfterMs = LOCK_AFTER_MINUTES * 60 * 1000;
+  const lockMatch = matches.find(
+    (m) => now >= m.startMs - lockBeforeMs && now <= m.startMs + lockAfterMs
+  );
+  const nextMatch = matches.find((m) => m.startMs > now);
+  return { locked: Boolean(lockMatch), lockMatch, nextMatch };
 }
 
 
@@ -122,14 +177,16 @@ function getTransferPhase() {
 
 router.get("/leaderboard", async (req, res) => {
   const teams = await Team.find().populate("user", "name email").populate("players").lean();
-  const ranked = teams
-    .map((t) => ({
+  const visible = teams.filter((t) => t.user);
+  const rankedRaw = await Promise.all(
+    visible.map(async (t) => ({
       id: t._id,
       name: t.name,
       owner: t.user?.name || "Unknown",
-      points: teamPoints(t.players || [])
+      points: await teamPointsSince(t)
     }))
-    .sort((a, b) => b.points - a.points);
+  );
+  const ranked = rankedRaw.sort((a, b) => b.points - a.points);
   res.json(ranked);
 });
 
@@ -152,6 +209,8 @@ router.get("/me", authRequired, async (req, res) => {
     postGroupResetDone: team.postGroupResetDone || false,
     lastSubmissionDate: team.lastSubmissionDate || null,
     submittedForDate: team.submittedForDate || null,
+    submittedForMatchId: team.submittedForMatchId || null,
+    submittedForMatchStart: team.submittedForMatchStart || null,
     submittedAt: team.submittedAt || team.createdAt,
     captain: team.captain || null,
     viceCaptain: team.viceCaptain || null
@@ -222,24 +281,37 @@ router.post("/", authRequired, async (req, res) => {
   const existing = await Team.findOne({ user: req.user.id });
   const phase = getTransferPhase();
   const today = new Date().toISOString().slice(0, 10);
-  const targetDate = nextFixtureDateUtc();
-  const lock = await isSubmissionLockedNow();
-  if (lock.locked) {
-    return res.status(403).json({ error: "Submissions are locked for the first 4 minutes after the first match starts." });
+  const matches = await getSeriesMatches();
+  const window = getSubmissionWindow(matches);
+  const now = Date.now();
+  const firstSubmittedStartMs = existing?.submittedForMatchStart
+    ? new Date(existing.submittedForMatchStart).getTime()
+    : null;
+  const inFirstSubmissionWindow =
+    Number.isFinite(firstSubmittedStartMs) &&
+    now < firstSubmittedStartMs &&
+    (existing?.transfersUsedTotal ?? 0) === 0;
+  if (window.locked) {
+    return res.status(403).json({
+      error: "Submissions are locked from 5 seconds before match start until 5 minutes after it starts."
+    });
   }
-
-  const firstStartTarget = await getFirstStartForDateUtc(targetDate);
-  if (firstStartTarget && Date.now() >= firstStartTarget) {
-    return res.status(403).json({ error: "Submissions for the next day are closed after the first match starts." });
+  if (!window.nextMatch) {
+    return res.status(403).json({ error: "No upcoming matches available for submission." });
   }
-
-  if (existing?.submittedForDate === targetDate) {
-    return res.status(400).json({ error: `You have already submitted your team for ${targetDate}.` });
+  if (
+    existing?.submittedForMatchId &&
+    existing.submittedForMatchId === window.nextMatch.id &&
+    !inFirstSubmissionWindow
+  ) {
+    return res.status(400).json({ error: "You have already submitted your team for the upcoming match." });
   }
 
   if (existing) {
     if (existing.lockedInLeague) {
-      if (phase === "FINAL" && !existing.postGroupResetDone) {
+      if (inFirstSubmissionWindow) {
+        // Free changes before the first submitted match starts; no transfers counted.
+      } else if (phase === "FINAL" && !existing.postGroupResetDone) {
         // One-time post-group reset: unlimited transfers before final phase cap applies
         existing.transfersLimit = FINAL_LIMIT;
         existing.transfersUsedTotal = 0;
@@ -276,7 +348,9 @@ router.post("/", authRequired, async (req, res) => {
     existing.captain = captainId;
     existing.viceCaptain = viceCaptainId;
     existing.lastSubmissionDate = today;
-    existing.submittedForDate = targetDate;
+    existing.submittedForDate = window.nextMatch.date || today;
+    existing.submittedForMatchId = window.nextMatch.id;
+    existing.submittedForMatchStart = new Date(window.nextMatch.startMs);
     await existing.save();
     return res.json({
       id: existing._id,
@@ -289,6 +363,8 @@ router.post("/", authRequired, async (req, res) => {
       postGroupResetDone: existing.postGroupResetDone || false,
       lastSubmissionDate: existing.lastSubmissionDate || null,
       submittedForDate: existing.submittedForDate || null,
+      submittedForMatchId: existing.submittedForMatchId || null,
+      submittedForMatchStart: existing.submittedForMatchStart || null,
       captain: existing.captain || null,
       viceCaptain: existing.viceCaptain || null
     });
@@ -309,7 +385,9 @@ router.post("/", authRequired, async (req, res) => {
     transferPhase,
     postGroupResetDone: transferPhase === "FINAL",
     lastSubmissionDate: today,
-    submittedForDate: targetDate,
+    submittedForDate: window.nextMatch.date || today,
+    submittedForMatchId: window.nextMatch.id,
+    submittedForMatchStart: new Date(window.nextMatch.startMs),
     submittedAt: new Date()
   });
   res.json({
@@ -323,6 +401,8 @@ router.post("/", authRequired, async (req, res) => {
     postGroupResetDone: team.postGroupResetDone || false,
     lastSubmissionDate: team.lastSubmissionDate || null,
     submittedForDate: team.submittedForDate || null,
+    submittedForMatchId: team.submittedForMatchId || null,
+    submittedForMatchStart: team.submittedForMatchStart || null,
     captain: team.captain || null,
     viceCaptain: team.viceCaptain || null
   });

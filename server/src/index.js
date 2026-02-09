@@ -52,8 +52,9 @@ mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log("MongoDB connected");
+    // Run daily sync at 19:00 UTC (7pm GMT)
     cron.schedule(
-      "0 20 * * *",
+      "0 19 * * *",
       async () => {
         try {
           const result = await updateAllLeaguesDaily();

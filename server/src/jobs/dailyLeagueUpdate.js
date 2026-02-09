@@ -137,6 +137,34 @@ function teamPoints(players) {
   }, 0);
 }
 
+async function teamPointsSince(team) {
+  const players = team?.players || [];
+  if (!players.length) return 0;
+  const startMs = team?.submittedForMatchStart
+    ? new Date(team.submittedForMatchStart).getTime()
+    : null;
+  if (!Number.isFinite(startMs)) {
+    return teamPoints(players);
+  }
+  const nameSet = new Set(players.map((p) => normalizeName(p.name)));
+  const docs = await FantasyMatchPoints.find({
+    $or: [
+      { matchStartMs: { $gt: startMs } },
+      { matchStartMs: { $exists: false }, matchDate: { $gte: new Date(startMs).toISOString().slice(0, 10) } }
+    ]
+  }).lean();
+  let total = 0;
+  for (const doc of docs) {
+    const points = Array.isArray(doc.points) ? doc.points : [];
+    for (const p of points) {
+      if (nameSet.has(normalizeName(p.name))) {
+        total += Number(p.total || 0);
+      }
+    }
+  }
+  return total;
+}
+
 async function computeLeagueStandings(league) {
   const memberIds = league.members || [];
   const users = await User.find({ _id: { $in: memberIds } }).select("name").lean();
@@ -147,10 +175,10 @@ async function computeLeagueStandings(league) {
     .lean();
   const teamMap = new Map(teams.map((t) => [String(t.user), t]));
 
-  const rows = memberIds.map((id) => {
+  const rows = await Promise.all(memberIds.map(async (id) => {
     const team = teamMap.get(String(id));
     const players = team?.players || [];
-    const points = team ? teamPoints(players) : 0;
+    const points = team ? await teamPointsSince(team) : 0;
     return {
       userId: String(id),
       userName: userMap.get(String(id)) || "Unknown",
@@ -158,7 +186,7 @@ async function computeLeagueStandings(league) {
       teamName: team?.name || "No Team",
       points
     };
-  });
+  }));
 
   rows.sort((a, b) => b.points - a.points);
   const ranked = rows.map((row, idx) => ({ ...row, rank: idx + 1 }));
@@ -181,21 +209,18 @@ export async function updateAllLeaguesDaily() {
 export async function buildLeagueDashboard(leagueId) {
   const league = await League.findById(leagueId).lean();
   if (!league) return null;
-  let standings = Array.isArray(league.standings) ? league.standings : [];
-  let updatedAt = league.standingsUpdatedAt || null;
-  if (!standings.length) {
-    standings = await computeLeagueStandings(league);
-    updatedAt = new Date();
-    await League.updateOne(
-      { _id: league._id },
-      { $set: { standings, standingsUpdatedAt: updatedAt } }
-    );
-  }
+  const standings = await computeLeagueStandings(league);
+  const updatedAt = new Date();
+  await League.updateOne(
+    { _id: league._id },
+    { $set: { standings, standingsUpdatedAt: updatedAt } }
+  );
   return {
     id: league._id,
     name: league.name,
     code: league.code,
     standings,
-    standingsUpdatedAt: updatedAt
+    standingsUpdatedAt: updatedAt,
+    membersCount: Array.isArray(league.members) ? league.members.length : 0
   };
 }
