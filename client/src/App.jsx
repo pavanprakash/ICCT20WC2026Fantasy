@@ -12,6 +12,8 @@ import Fixtures from "./pages/Fixtures.jsx";
 import Rules from "./pages/Rules.jsx";
 import ViewPoints from "./pages/ViewPoints.jsx";
 import ViewSubmission from "./pages/ViewSubmission.jsx";
+import Profile from "./pages/Profile.jsx";
+import t20Logo from "./assets/t20-logo.png";
 
 function Navbar({ user, onLogout }) {
   const location = useLocation();
@@ -35,7 +37,9 @@ function Navbar({ user, onLogout }) {
         <span />
       </button>
       <div className="brand">
-        <span className="brand__tag">ICC 2026</span>
+        <span className="brand__tag">
+          <img src={t20Logo} alt="ICC Men's T20 World Cup 2026" className="brand__logo" />
+        </span>
         <Link to="/" className="brand__title">
           Fantasy League
         </Link>
@@ -47,6 +51,7 @@ function Navbar({ user, onLogout }) {
         <Link to="/points">View Points</Link>
         <Link to="/leaderboard">Leaderboard</Link>
         <Link to="/league">Create League</Link>
+        <Link to="/profile">My Profile</Link>
       </nav>
       <div className="nav__auth">
         {user ? (
@@ -71,7 +76,9 @@ function Navbar({ user, onLogout }) {
         <div className="nav-drawer__panel">
           <div className="nav-drawer__header">
             <div className="brand">
-              <span className="brand__tag">ICC 2026</span>
+              <span className="brand__tag">
+                <img src={t20Logo} alt="ICC Men's T20 World Cup 2026" className="brand__logo" />
+              </span>
               <span className="brand__title">Menu</span>
             </div>
             <button
@@ -90,6 +97,7 @@ function Navbar({ user, onLogout }) {
             <Link to="/points">View Points</Link>
             <Link to="/leaderboard">Leaderboard</Link>
             <Link to="/league">Create League</Link>
+            <Link to="/profile">My Profile</Link>
           </nav>
           <div className="nav-drawer__auth">
             {user ? (
@@ -172,6 +180,10 @@ export default function App() {
           <Route
             path="/team"
             element={user ? <TeamBuilder context={context} /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/profile"
+            element={user ? <Profile /> : <Navigate to="/auth" />}
           />
           <Route
             path="/league"

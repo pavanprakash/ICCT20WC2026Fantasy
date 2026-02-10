@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { authRequired } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -52,6 +53,31 @@ router.post("/login", async (req, res) => {
     );
 
     res.json({ token, user: { id: user._id, name: user.name, email: user.email } });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/change-password", authRequired, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body || {};
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
+    if (String(oldPassword) === String(newPassword)) {
+      return res.status(400).json({ error: "New password must be different from old password" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const ok = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!ok) return res.status(401).json({ error: "Old password is incorrect" });
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }

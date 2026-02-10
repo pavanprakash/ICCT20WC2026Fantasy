@@ -62,17 +62,17 @@ main {
   align-items: center;
   justify-content: space-between;
   padding: 18px 8vw;
-  background: rgba(249, 251, 255, 0.82);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--line);
+  background: linear-gradient(120deg, #0b2a6e 0%, #0a1f4d 55%, #09183a 100%);
+  color: #f8fbff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .nav__burger {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
   display: grid;
   place-items: center;
   gap: 5px;
@@ -84,7 +84,7 @@ main {
   display: block;
   width: 18px;
   height: 2px;
-  background: #0b0f1a;
+  background: #f8fbff;
   border-radius: 999px;
 }
 
@@ -95,21 +95,27 @@ main {
 }
 
 .brand__tag {
-  background: linear-gradient(120deg, var(--accent), var(--neon));
-  color: #0b0f1a;
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
   border-radius: 999px;
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  box-shadow: var(--glow);
-  font-weight: 700;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.brand__logo {
+  display: block;
+  height: 36px;
+  width: auto;
 }
 
 .brand__title {
   font-family: "Syne", sans-serif;
   font-size: 22px;
   letter-spacing: 0.02em;
+  color: #f8fbff;
 }
 
 .nav__links {
@@ -120,6 +126,7 @@ main {
 
 .nav__links a {
   position: relative;
+  color: #f8fbff;
 }
 
 .nav__links a::after {
@@ -129,7 +136,7 @@ main {
   bottom: -6px;
   height: 2px;
   width: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--neon));
+  background: rgba(255, 255, 255, 0.85);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.2s ease;
@@ -156,6 +163,21 @@ main {
   display: flex;
   gap: 12px;
   align-items: center;
+  color: #f8fbff;
+}
+
+.nav .btn--ghost {
+  color: #f8fbff;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.nav .btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.nav__user {
+  color: #f8fbff;
 }
 
 .nav-drawer {
@@ -178,10 +200,10 @@ main {
   top: 16px;
   left: 16px;
   width: min(86vw, 320px);
-  background: rgba(255, 255, 255, 0.96);
+  background: linear-gradient(160deg, #0b2a6e 0%, #0a1f4d 55%, #09183a 100%);
   border-radius: 20px;
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 18px 36px rgba(9, 15, 36, 0.45);
   padding: 18px;
   display: grid;
   gap: 18px;
@@ -200,11 +222,32 @@ main {
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
   font-size: 20px;
   line-height: 28px;
+  color: #f8fbff;
+}
+
+.nav-drawer__panel .brand__title,
+.nav-drawer__panel .nav__user,
+.nav-drawer__panel .nav-drawer__links a {
+  color: #f8fbff;
+}
+
+.nav-drawer__panel .nav-drawer__links a::after {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.nav-drawer__panel .btn--ghost {
+  color: #f8fbff;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.nav-drawer__panel .btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .nav-drawer__links {
@@ -718,6 +761,12 @@ main {
   border-radius: 12px;
 }
 
+.notice--success {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #166534;
+}
+
 .label {
   display: block;
   font-weight: 600;
@@ -1013,6 +1062,39 @@ main {
 
   .filter-meta {
     justify-self: start;
+  }
+
+  .card {
+    padding: 14px;
+    gap: 6px;
+  }
+
+  .card__top h4 {
+    font-size: 14px;
+  }
+
+  .pill {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .card__footer {
+    font-size: 12px;
+    gap: 4px;
+  }
+
+  .card__top {
+    gap: 6px;
+  }
+
+  .card__footer {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .card--select .muted {
+    font-size: 12px;
   }
 }
 
