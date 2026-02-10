@@ -68,12 +68,19 @@ const getStatusLabel = (match) => {
 router.get("/", async (req, res) => {
   try {
     const key = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
-    const data = await cricapiGet("/cricScore", req.query, key);
-    const list = Array.isArray(data?.data) ? data.data : [];
+    const seriesId = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
+    const data = await cricapiGet("/series_info", { id: seriesId }, key);
+    const raw =
+      data?.data?.matchList ||
+      data?.data?.matches ||
+      data?.data?.match ||
+      [];
+    const list = Array.isArray(raw) ? raw : [];
     if (req.query?.debug) {
       return res.json({
         sampleSeries: list.slice(0, 5).map((m) => m?.series || m?.seriesName || null),
-        sampleMs: list.slice(0, 5).map((m) => m?.ms || m?.matchStatus || m?.status || null),
+        sampleStatus: list.slice(0, 5).map((m) => m?.status || m?.matchStatus || null),
+        sampleVenue: list.slice(0, 5).map((m) => m?.venue || m?.venueName || null),
         sampleIds: list.slice(0, 5).map((m) => m?.id || null),
         total: list.length
       });
@@ -82,18 +89,27 @@ router.get("/", async (req, res) => {
     const matches = list
       .filter((match) => normalize(match?.series || match?.seriesName) === "icc men's t20 world cup 2026")
       .filter((match) => {
-        const ms = normalize(match?.ms || match?.matchStatus || match?.status);
-        return ms === "fixture" || ms === "scheduled" || ms === "upcoming";
+        const status = normalize(match?.matchStatus || match?.status || "");
+        const isCompleted = /match ended|result|won|abandoned|no result|draw|tied|complete|completed|match over|finished/.test(status);
+        return !isCompleted;
       })
       .map((match) => {
         const teams = parseTeams(match);
         const gmt = toGmt(match);
+        const venue =
+          match?.venue ||
+          match?.venueName ||
+          match?.venue?.name ||
+          match?.ground ||
+          match?.groundName ||
+          match?.city ||
+          "TBD";
         return {
           id: match?.id,
           name: match?.name,
           team1: teams.team1,
           team2: teams.team2,
-          venue: match?.venue || match?.venueName || "TBD",
+          venue,
           stage: match?.matchType || match?.matchTypeLower || match?.matchFormat || "Group",
           date: gmt.date,
           timeGMT: gmt.timeGMT,

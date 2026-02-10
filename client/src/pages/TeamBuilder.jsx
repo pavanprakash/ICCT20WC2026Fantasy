@@ -3,7 +3,7 @@ import api from "../api.js";
 import fixtures from "../data/fixtures-2026.js";
 import SelectedTeamField from "../components/SelectedTeamField.jsx";
 
-const BUDGET = 100;
+const BUDGET = 90;
 const TEAM_SIZE = 11;
 const MAX_PER_TEAM = 7;
 const ROLE_LIMITS = {
@@ -11,6 +11,12 @@ const ROLE_LIMITS = {
   bowl: 5,
   wk: 4,
   ar: 4
+};
+const ROLE_MIN = {
+  bat: 3,
+  bowl: 3,
+  wk: 1,
+  ar: 1
 };
 const MATCH_DURATION_MS = 4 * 60 * 60 * 1000;
 const SYNC_WINDOW_MS = 10 * 60 * 1000;
@@ -49,6 +55,7 @@ const computeMatchWindow = (matches) => {
 };
 
 export default function TeamBuilder() {
+  const statusRef = React.useRef(null);
   const [players, setPlayers] = useState([]);
   const [selected, setSelected] = useState([]);
   const [teamName, setTeamName] = useState("My XI");
@@ -499,12 +506,12 @@ export default function TeamBuilder() {
     return minutes;
   }, [isSubmissionLocked, lockMeta.lockUntil]);
   const firstSubmitFreeWindow = useMemo(() => {
-    if (!teamMeta?.submittedForMatchStart) return false;
-    const start = new Date(teamMeta.submittedForMatchStart).getTime();
+    if (!nextMatch?.startMs) return false;
+    const start = Number(nextMatch.startMs);
     if (!Number.isFinite(start)) return false;
     const used = teamMeta?.transfersUsedTotal ?? 0;
     return Date.now() < start && used === 0;
-  }, [teamMeta?.submittedForMatchStart, teamMeta?.transfersUsedTotal]);
+  }, [nextMatch?.startMs, teamMeta?.transfersUsedTotal]);
 
   const alreadySubmittedForNext =
     teamMeta?.submittedForMatchId &&
@@ -516,25 +523,42 @@ export default function TeamBuilder() {
     roleCounts.bat <= ROLE_LIMITS.bat &&
     roleCounts.bowl <= ROLE_LIMITS.bowl &&
     roleCounts.wk <= ROLE_LIMITS.wk &&
-    roleCounts.ar <= ROLE_LIMITS.ar;
+    roleCounts.ar <= ROLE_LIMITS.ar &&
+    roleCounts.bat >= ROLE_MIN.bat &&
+    roleCounts.bowl >= ROLE_MIN.bowl &&
+    roleCounts.wk >= ROLE_MIN.wk &&
+    roleCounts.ar >= ROLE_MIN.ar;
   const canSubmitTeam = selected.length === TEAM_SIZE && formationOk && hasCaptains;
 
   const saveTeam = async () => {
     setStatus(null);
+    const focusStatus = (message) => {
+      setStatus(message);
+      setTimeout(() => {
+        statusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 0);
+    };
     try {
       if (selected.length !== TEAM_SIZE) {
-        setStatus("Pick exactly 11 players before saving.");
+        focusStatus("Pick exactly 11 players before saving.");
+        return;
+      }
+      if (!formationOk) {
+        focusStatus("Formation rules not met: min 3 batters, 3 bowlers, 1 wicket-keeper, 1 all-rounder.");
         return;
       }
       if (!hasCaptains) {
-        setStatus("Select a captain and a vice-captain.");
+        focusStatus("Select a captain and a vice-captain.");
         return;
       }
       const res = await api.post("/teams", {
         name: teamName,
         playerIds: selected,
         captainId,
-        viceCaptainId
+        viceCaptainId,
+        nextMatch: nextMatch
+          ? { id: nextMatch.id, startMs: nextMatch.startMs, date: nextMatch.date }
+          : null
       });
       if (res.data) {
         setTeamMeta((prev) => ({
@@ -557,7 +581,7 @@ export default function TeamBuilder() {
       }
       setStatus("Team saved successfully.");
     } catch (err) {
-      setStatus(err.response?.data?.error || "Failed to save team");
+      focusStatus(err.response?.data?.error || "Failed to save team");
     }
   };
 
@@ -666,14 +690,18 @@ export default function TeamBuilder() {
               <strong>{dailyPoints.loading ? "..." : matchesForTargetDate}</strong>
             </div>
           </div>
-          {status && <div className="notice">{status}</div>}
+          {status && (
+            <div className="notice" ref={statusRef}>
+              {status}
+            </div>
+          )}
           {isSubmissionLocked && submissionLock.message ? (
             <div className="notice">{submissionLock.message}{lockCountdown !== null ? ` (${lockCountdown} min)` : ""}</div>
           ) : null}
           {alreadySubmittedForNext ? (
             <div className="notice">You have already submitted your team for the upcoming match.</div>
           ) : null}
-          {firstSubmitFreeWindow ? (
+          {firstSubmitFreeWindow && !teamMeta?.submittedForMatchStart ? (
             <div className="notice">Free changes until your first match starts.</div>
           ) : null}
           {teamMeta?.lockedInLeague ? (
@@ -762,7 +790,7 @@ export default function TeamBuilder() {
             )}
           </div>
           <div className="muted">
-            Formation limits: max 5 batters, 5 bowlers, 4 wicket-keepers, 4 all-rounders.
+            Formation limits: min 3 batters, 3 bowlers, 1 wicket-keeper, 1 all-rounder. Max 5 batters, 5 bowlers, 4 wicket-keepers, 4 all-rounders.
           </div>
           <button
             className="btn btn--primary"
@@ -783,6 +811,23 @@ export default function TeamBuilder() {
             {teamMeta && !isEditing ? "Update Team" : selected.length > 0 ? "Submit Team" : "Select Team"}
             {teamMeta && isEditing ? ` (${editTimerLabel})` : ""}
           </button>
+          {teamMeta && isEditing ? (
+            <button
+              className="btn btn--reset"
+              type="button"
+              onClick={() => {
+                setSelected(savedTeam.players || []);
+                setCaptainId(savedTeam.captainId || "");
+                setViceCaptainId(savedTeam.viceCaptainId || "");
+                setStatus("Changes reset to saved team.");
+                setTimeout(() => {
+                  statusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                }, 0);
+              }}
+            >
+              Reset Team
+            </button>
+          ) : null}
         </div>
 
         <div>

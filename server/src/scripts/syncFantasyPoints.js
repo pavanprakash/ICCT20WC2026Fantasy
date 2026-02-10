@@ -72,21 +72,40 @@ async function run() {
   await ensureRules();
   const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
 
-  const matches = [];
-  // currentMatches is paginated via offset; fetch until empty or safety cap.
-  const PAGE_SIZE = 25;
-  const MAX_PAGES = 20;
   const debug = String(process.env.DEBUG_SYNC || "").toLowerCase() === "true";
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const offset = page * PAGE_SIZE;
-    const current = await cricapiGet("/currentMatches", { offset }, SERIES_KEY);
-    const list = Array.isArray(current?.data) ? current.data : [];
-    if (!list.length) break;
-    for (const m of list) {
-      const seriesId = String(m?.series_id || m?.seriesId || "");
-      if (seriesId === SERIES_ID) matches.push(m);
+  let matches = [];
+  let seriesList = [];
+  let seriesStatus = null;
+  let seriesReason = null;
+  try {
+    const seriesInfo = await cricapiGet("/series_info", { id: SERIES_ID }, SERIES_KEY);
+    seriesStatus = seriesInfo?.status || null;
+    seriesReason = seriesInfo?.reason || seriesInfo?.message || null;
+    const raw =
+      seriesInfo?.data?.matchList ||
+      seriesInfo?.data?.matches ||
+      seriesInfo?.data?.match ||
+      [];
+    seriesList = Array.isArray(raw) ? raw : [];
+    matches = seriesList.filter(isT20WorldCup2026);
+  } catch (err) {
+    // fall back to currentMatches
+  }
+  if (!matches.length) {
+    // currentMatches is paginated via offset; fetch until empty or safety cap.
+    const PAGE_SIZE = 25;
+    const MAX_PAGES = 20;
+    for (let page = 0; page < MAX_PAGES; page += 1) {
+      const offset = page * PAGE_SIZE;
+      const current = await cricapiGet("/currentMatches", { offset }, SERIES_KEY);
+      const list = Array.isArray(current?.data) ? current.data : [];
+      if (!list.length) break;
+      for (const m of list) {
+        const seriesId = String(m?.series_id || m?.seriesId || "");
+        if (seriesId === SERIES_ID) matches.push(m);
+      }
+      if (list.length < PAGE_SIZE) break;
     }
-    if (list.length < PAGE_SIZE) break;
   }
   if (debug) {
     const ended = matches.filter((m) => m?.matchEnded === true).length;
@@ -94,6 +113,9 @@ async function run() {
     console.log(
       JSON.stringify({
         debug: true,
+        seriesStatus,
+        seriesReason,
+        seriesListTotal: seriesList.length,
         matchesTotal: matches.length,
         matchesEnded: ended,
         sampleSeriesIds: seriesIds

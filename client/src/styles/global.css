@@ -604,6 +604,13 @@ main {
   backdrop-filter: blur(8px);
 }
 
+.btn--reset {
+  background: rgba(74, 215, 255, 0.25);
+  border: 1px solid rgba(74, 215, 255, 0.6);
+  color: #0b2f3f;
+  font-weight: 700;
+}
+
 .team-builder {
   display: grid;
   grid-template-columns: 280px 1fr;

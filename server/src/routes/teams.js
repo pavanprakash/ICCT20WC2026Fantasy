@@ -90,6 +90,12 @@ const ROLE_LIMITS = {
   wk: 4,
   ar: 4
 };
+const ROLE_MIN = {
+  bat: 3,
+  bowl: 3,
+  wk: 1,
+  ar: 1
+};
 
 const normalize = (value) => String(value || "").toLowerCase();
 
@@ -108,8 +114,6 @@ function parseUtc(dateStr, timeStr) {
 function isTargetMatch(match) {
   const seriesId = String(match?.series_id || match?.seriesId || "");
   if (seriesId && seriesId === SERIES_ID) return true;
-  const seriesName = normalize(match?.series || match?.seriesName || "");
-  if (seriesName === "icc men's t20 world cup 2026") return true;
   const hay = [
     match?.name,
     match?.series,
@@ -120,10 +124,11 @@ function isTargetMatch(match) {
   ]
     .filter(Boolean)
     .join(" ");
-  const hasT20 = /t20/.test(normalize(hay));
-  const hasWC = /world cup/.test(normalize(hay));
+  const norm = normalize(hay);
+  const hasT20 = /t20/.test(norm);
+  const hasWC = /world cup/.test(norm);
   const dateText = `${match?.dateTime || ""} ${match?.dateTimeGMT || ""} ${match?.date || ""}`;
-  const has2026 = /2026/.test(hay) || /2026/.test(dateText);
+  const has2026 = /2026/.test(norm) || /2026/.test(dateText);
   return hasT20 && hasWC && has2026;
 }
 
@@ -155,7 +160,8 @@ function nextFixtureDateUtc() {
 }
 
 async function getSeriesMatches() {
-  const data = await cricapiGet("/cricScore", {});
+  const key = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
+  const data = await cricapiGet("/cricScore", {}, key);
   const list = Array.isArray(data?.data) ? data.data : [];
   return list
     .filter(isTargetMatch)
@@ -167,6 +173,27 @@ async function getSeriesMatches() {
     .filter((m) => m && m.id && Number.isFinite(m.startMs))
     .sort((a, b) => a.startMs - b.startMs);
 }
+
+router.get("/upcoming", async (req, res) => {
+  try {
+    if (req.query?.debug) {
+      const key = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
+      const data = await cricapiGet("/cricScore", {}, key);
+      const list = Array.isArray(data?.data) ? data.data : [];
+      return res.json({
+        totalRaw: list.length,
+        sampleRaw: list.slice(0, 5)
+      });
+    }
+    const matches = await getSeriesMatches();
+    res.json({
+      total: matches.length,
+      sample: matches.slice(0, 3)
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
 
 function getSubmissionWindow(matches, now = Date.now()) {
   const lockBeforeMs = LOCK_BEFORE_SECONDS * 1000;
@@ -238,7 +265,7 @@ router.get("/me", authRequired, async (req, res) => {
 });
 
 router.post("/", authRequired, async (req, res) => {
-  const { name, playerIds, captainId, viceCaptainId } = req.body;
+  const { name, playerIds, captainId, viceCaptainId, nextMatch: clientNextMatch } = req.body;
   if (!name || !Array.isArray(playerIds)) {
     return res.status(400).json({ error: "Missing fields" });
   }
@@ -274,8 +301,8 @@ router.post("/", authRequired, async (req, res) => {
   }
 
   const totalPrice = players.reduce((sum, p) => sum + p.price, 0);
-  if (totalPrice > 100) {
-    return res.status(400).json({ error: "Budget exceeded (max 100)" });
+  if (totalPrice > 90) {
+    return res.status(400).json({ error: "Budget exceeded (max 90)" });
   }
 
   const roleCounts = players.reduce(
@@ -297,19 +324,47 @@ router.post("/", authRequired, async (req, res) => {
       error: "Formation limits exceeded (max 5 batters, 5 bowlers, 4 wicket-keepers, 4 all-rounders)."
     });
   }
+  if (roleCounts.bat < ROLE_MIN.bat ||
+      roleCounts.bowl < ROLE_MIN.bowl ||
+      roleCounts.wk < ROLE_MIN.wk ||
+      roleCounts.ar < ROLE_MIN.ar) {
+    return res.status(400).json({
+      error: "Formation limits not met (min 3 batters, 3 bowlers, 1 wicket-keeper, 1 all-rounder)."
+    });
+  }
 
   const existing = await Team.findOne({ user: req.user.id });
   const phase = getTransferPhase();
   const today = new Date().toISOString().slice(0, 10);
   const matches = await getSeriesMatches();
   const window = getSubmissionWindow(matches);
+  const clientStartMs = clientNextMatch?.startMs ? Number(clientNextMatch.startMs) : null;
+  const clientFallback =
+    clientNextMatch && Number.isFinite(clientStartMs)
+      ? {
+          id: String(clientNextMatch.id || `client-${clientStartMs}`),
+          startMs: clientStartMs,
+          date: clientNextMatch.date || new Date(clientStartMs).toISOString().slice(0, 10)
+        }
+      : null;
+  if (!window.nextMatch && clientFallback) {
+    window.nextMatch = clientFallback;
+  }
+  if (!window.lockMatch && clientFallback) {
+    const nowMs = Date.now();
+    if (nowMs >= clientFallback.startMs - LOCK_BEFORE_SECONDS * 1000 &&
+        nowMs <= clientFallback.startMs + LOCK_AFTER_MINUTES * 60 * 1000) {
+      window.lockMatch = clientFallback;
+      window.locked = true;
+    }
+  }
   const now = Date.now();
-  const firstSubmittedStartMs = existing?.submittedForMatchStart
-    ? new Date(existing.submittedForMatchStart).getTime()
+  const earliestStartMs = window.nextMatch?.startMs
+    ? Number(window.nextMatch.startMs)
     : null;
   const inFirstSubmissionWindow =
-    Number.isFinite(firstSubmittedStartMs) &&
-    now < firstSubmittedStartMs &&
+    Number.isFinite(earliestStartMs) &&
+    now < earliestStartMs &&
     (existing?.transfersUsedTotal ?? 0) === 0;
   if (window.locked) {
     return res.status(403).json({
