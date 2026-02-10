@@ -3,6 +3,7 @@ import FantasyRule from "../models/FantasyRule.js";
 import FantasyMatchPoints from "../models/FantasyMatchPoints.js";
 import Player from "../models/Player.js";
 import Team from "../models/Team.js";
+import TeamSubmission from "../models/TeamSubmission.js";
 import { authRequired } from "../middleware/auth.js";
 import { cricapiGet } from "../services/cricapi.js";
 import { calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
@@ -32,6 +33,13 @@ function totalWithCaptaincy(points, captainName, viceName) {
     }
   }
   return total;
+}
+
+function getPlayerNameById(players, idOrObj) {
+  if (!idOrObj || !Array.isArray(players)) return null;
+  const id = idOrObj?._id || idOrObj;
+  const found = players.find((p) => String(p._id) === String(id));
+  return found?.name || null;
 }
 
 function isCompletedMatch(match) {
@@ -221,23 +229,28 @@ router.post("/sync", async (req, res) => {
 router.get("/daily", authRequired, async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
-    const team = await Team.findOne({ user: req.user.id }).populate("players").lean();
-    if (!team) return res.json({ date, totalPoints: 0, matches: 0 });
+    const submissions = await TeamSubmission.find({ user: req.user.id, matchDate: date })
+      .populate("players")
+      .populate("captain")
+      .populate("viceCaptain")
+      .lean();
+    if (!submissions.length) return res.json({ date, totalPoints: 0, matches: 0 });
 
-    const nameSet = new Set(team.players.map((p) => normalizeName(p.name)));
-    const docs = await FantasyMatchPoints.find({ matchDate: date }).lean();
+    const matchIds = submissions.map((s) => s.matchId);
+    const docs = await FantasyMatchPoints.find({ matchId: { $in: matchIds } }).lean();
+    const pointsMap = new Map(docs.map((d) => [String(d.matchId), d.points || []]));
 
     let total = 0;
-    for (const doc of docs) {
-      const points = Array.isArray(doc.points) ? doc.points : [];
-      for (const p of points) {
-        if (nameSet.has(normalizeName(p.name))) {
-          total += Number(p.total || 0);
-        }
-      }
+    let matches = 0;
+    for (const s of submissions) {
+      const points = pointsMap.get(String(s.matchId)) || [];
+      const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
+      const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
+      total += totalWithCaptaincy(filtered, s.captain?.name, s.viceCaptain?.name);
+      matches += 1;
     }
 
-    res.json({ date, totalPoints: total, matches: docs.length });
+    res.json({ date, totalPoints: total, matches });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -290,6 +303,137 @@ router.post("/points/since", authRequired, async (req, res) => {
     }
 
     res.json({ since: startMs, totalPoints: total, matches: docs.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/submissions", authRequired, async (req, res) => {
+  try {
+    const submissions = await TeamSubmission.find({ user: req.user.id })
+      .populate("players")
+      .populate("captain")
+      .populate("viceCaptain")
+      .sort({ matchStartMs: -1, createdAt: -1 })
+      .lean();
+
+    const matchIds = submissions.map((s) => s.matchId);
+    const pointsDocs = await FantasyMatchPoints.find({ matchId: { $in: matchIds } }).lean();
+    const pointsMap = new Map(pointsDocs.map((d) => [String(d.matchId), d.points || []]));
+
+    const rows = submissions.map((s) => {
+      const points = pointsMap.get(String(s.matchId)) || [];
+      const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
+      const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
+      const capName = s.captain?.name || getPlayerNameById(s.players, s.captain);
+      const vcName = s.viceCaptain?.name || getPlayerNameById(s.players, s.viceCaptain);
+      const capKey = normalizeName(capName);
+      const vcKey = normalizeName(vcName);
+      const breakdown = filtered
+        .map((p) => {
+          const key = normalizeName(p.name);
+          const base = Number(p.total || 0);
+          let multiplier = 1;
+          if (capKey && key === capKey) multiplier = 2;
+          else if (vcKey && key === vcKey) multiplier = 1.5;
+          return {
+            name: p.name,
+            basePoints: base,
+            multiplier,
+            totalPoints: base * multiplier
+          };
+        })
+        .sort((a, b) => b.totalPoints - a.totalPoints);
+      const total = totalWithCaptaincy(filtered, s.captain?.name, s.viceCaptain?.name);
+      return {
+        id: s._id,
+        matchId: s.matchId,
+        matchDate: s.matchDate || null,
+        matchStartMs: s.matchStartMs || null,
+        matchName: s.matchName || null,
+        team1: s.team1 || null,
+        team2: s.team2 || null,
+        venue: s.venue || null,
+        totalPoints: total,
+        breakdown
+      };
+    });
+
+    res.json({ total: rows.length, submissions: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/submissions/:id", async (req, res) => {
+  try {
+    const submission =
+      (await TeamSubmission.findOne({ _id: req.params.id })
+        .populate("players")
+        .populate("captain")
+        .populate("viceCaptain")
+        .lean()) ||
+      (await TeamSubmission.findOne({ matchId: req.params.id })
+        .populate("players")
+        .populate("captain")
+        .populate("viceCaptain")
+        .lean());
+
+    if (!submission) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    const pointsDoc = await FantasyMatchPoints.findOne({ matchId: submission.matchId }).lean();
+    const points = Array.isArray(pointsDoc?.points) ? pointsDoc.points : [];
+    const nameSet = new Set((submission.players || []).map((p) => normalizeName(p.name)));
+    const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
+    const capName = submission.captain?.name || getPlayerNameById(submission.players, submission.captain);
+    const vcName = submission.viceCaptain?.name || getPlayerNameById(submission.players, submission.viceCaptain);
+    const capKey = normalizeName(capName);
+    const vcKey = normalizeName(vcName);
+    const breakdown = filtered
+      .map((p) => {
+        const key = normalizeName(p.name);
+        const base = Number(p.total || 0);
+        let multiplier = 1;
+        if (capKey && key === capKey) multiplier = 2;
+        else if (vcKey && key === vcKey) multiplier = 1.5;
+        return {
+          name: p.name,
+          basePoints: base,
+          multiplier,
+          totalPoints: base * multiplier
+        };
+      })
+      .sort((a, b) => b.totalPoints - a.totalPoints);
+
+    const payload = {
+      submission: {
+        id: submission._id,
+        matchId: submission.matchId,
+        matchDate: submission.matchDate || null,
+        matchStartMs: submission.matchStartMs || null,
+        matchName: submission.matchName || null,
+        team1: submission.team1 || null,
+        team2: submission.team2 || null,
+        venue: submission.venue || null,
+        totalPoints: totalWithCaptaincy(filtered, capName, vcName),
+        players: submission.players || [],
+        captainId: submission.captain?._id || submission.captain || null,
+        viceCaptainId: submission.viceCaptain?._id || submission.viceCaptain || null,
+        breakdown
+      }
+    };
+    if (req.query?.debug) {
+      payload.debug = {
+        capName,
+        vcName,
+        capKey,
+        vcKey,
+        sampleNames: filtered.slice(0, 5).map((p) => p.name)
+      };
+    }
+    res.json(payload);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

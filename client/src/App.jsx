@@ -10,6 +10,8 @@ import LeagueCreate from "./pages/LeagueCreate.jsx";
 import LeagueDashboard from "./pages/LeagueDashboard.jsx";
 import Fixtures from "./pages/Fixtures.jsx";
 import Rules from "./pages/Rules.jsx";
+import ViewPoints from "./pages/ViewPoints.jsx";
+import ViewSubmission from "./pages/ViewSubmission.jsx";
 
 function Navbar({ user, onLogout }) {
   const location = useLocation();
@@ -42,6 +44,7 @@ function Navbar({ user, onLogout }) {
         <Link to="/fixtures">Fixtures</Link>
         <Link to="/rules">Rules</Link>
         <Link to="/team">Create Team</Link>
+        <Link to="/points">View Points</Link>
         <Link to="/leaderboard">Leaderboard</Link>
         <Link to="/league">Create League</Link>
       </nav>
@@ -84,6 +87,7 @@ function Navbar({ user, onLogout }) {
             <Link to="/fixtures">Fixtures</Link>
             <Link to="/rules">Rules</Link>
             <Link to="/team">Create Team</Link>
+            <Link to="/points">View Points</Link>
             <Link to="/leaderboard">Leaderboard</Link>
             <Link to="/league">Create League</Link>
           </nav>
@@ -157,6 +161,14 @@ export default function App() {
           <Route path="/fixtures" element={<Fixtures />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route
+            path="/points"
+            element={user ? <ViewPoints /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/points/:id"
+            element={user ? <ViewSubmission /> : <Navigate to="/auth" />}
+          />
           <Route
             path="/team"
             element={user ? <TeamBuilder context={context} /> : <Navigate to="/auth" />}

@@ -135,6 +135,19 @@ main {
   transition: transform 0.2s ease;
 }
 
+.link {
+  color: var(--accent-dark);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link--points {
+  color: var(--accent);
+}
 .nav__links a:hover::after {
   transform: scaleX(1);
 }
@@ -329,6 +342,11 @@ main {
 
 .grid--players {
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-auto-rows: 160px;
+  max-height: calc(4 * 160px + 3 * 20px);
+  overflow-y: auto;
+  padding-right: 6px;
+  margin-top: 16px;
 }
 
 .team-field {
@@ -463,11 +481,17 @@ main {
   align-items: center;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.8);
+  flex-wrap: wrap;
 }
 
 .player-chip__country {
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.player-chip__points {
+  font-weight: 700;
+  color: #c6ffe3;
 }
 
 .chip-remove {
@@ -515,6 +539,7 @@ main {
   cursor: pointer;
   text-align: left;
   transition: transform 0.2s ease, border 0.2s ease;
+  height: 100%;
 }
 
 .card--selected {
@@ -771,6 +796,10 @@ main {
   grid-template-columns: 80px 1.4fr 1fr 120px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--line);
+}
+
+.table--points .table__row {
+  grid-template-columns: 120px 110px 1.6fr 1fr 90px;
 }
 
 .table__row:last-child {

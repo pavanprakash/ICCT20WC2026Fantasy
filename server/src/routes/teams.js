@@ -3,6 +3,7 @@ import Team from "../models/Team.js";
 import Player from "../models/Player.js";
 import League from "../models/League.js";
 import FantasyMatchPoints from "../models/FantasyMatchPoints.js";
+import TeamSubmission from "../models/TeamSubmission.js";
 import fixtures from "../data/fixtures-2026.js";
 import { cricapiGet } from "../services/cricapi.js";
 import { authRequired } from "../middleware/auth.js";
@@ -66,6 +67,26 @@ async function teamPointsSince(team) {
     const points = Array.isArray(doc.points) ? doc.points : [];
     const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
     total += totalWithCaptaincy(filtered, team?.captain?.name, team?.viceCaptain?.name);
+  }
+  return total;
+}
+
+async function teamPointsFromSubmissions(userId) {
+  const submissions = await TeamSubmission.find({ user: userId })
+    .populate("players")
+    .populate("captain")
+    .populate("viceCaptain")
+    .lean();
+  if (!submissions.length) return 0;
+  const matchIds = submissions.map((s) => s.matchId);
+  const pointsDocs = await FantasyMatchPoints.find({ matchId: { $in: matchIds } }).lean();
+  const pointsMap = new Map(pointsDocs.map((d) => [String(d.matchId), d.points || []]));
+  let total = 0;
+  for (const s of submissions) {
+    const points = pointsMap.get(String(s.matchId)) || [];
+    const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
+    const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
+    total += totalWithCaptaincy(filtered, s.captain?.name, s.viceCaptain?.name);
   }
   return total;
 }
@@ -230,7 +251,7 @@ router.get("/leaderboard", async (req, res) => {
       id: t._id,
       name: t.name,
       owner: t.user?.name || "Unknown",
-      points: await teamPointsSince(t)
+      points: await teamPointsFromSubmissions(t.user?._id)
     }))
   );
   const ranked = rankedRaw.sort((a, b) => b.points - a.points);
@@ -258,6 +279,7 @@ router.get("/me", authRequired, async (req, res) => {
     submittedForDate: team.submittedForDate || null,
     submittedForMatchId: team.submittedForMatchId || null,
     submittedForMatchStart: team.submittedForMatchStart || null,
+    firstSubmittedMatchStart: team.firstSubmittedMatchStart || null,
     submittedAt: team.submittedAt || team.createdAt,
     captain: team.captain || null,
     viceCaptain: team.viceCaptain || null
@@ -362,10 +384,15 @@ router.post("/", authRequired, async (req, res) => {
   const earliestStartMs = window.nextMatch?.startMs
     ? Number(window.nextMatch.startMs)
     : null;
+  const firstMatchStartMs = existing?.firstSubmittedMatchStart
+    ? new Date(existing.firstSubmittedMatchStart).getTime()
+    : (existing?.submittedForMatchStart ? new Date(existing.submittedForMatchStart).getTime() : null);
   const inFirstSubmissionWindow =
-    Number.isFinite(earliestStartMs) &&
-    now < earliestStartMs &&
-    (existing?.transfersUsedTotal ?? 0) === 0;
+    Number.isFinite(firstMatchStartMs)
+      ? now < firstMatchStartMs && (existing?.transfersUsedTotal ?? 0) === 0
+      : Number.isFinite(earliestStartMs) &&
+        now < earliestStartMs &&
+        (existing?.transfersUsedTotal ?? 0) === 0;
   if (window.locked) {
     return res.status(403).json({
       error: "Submissions are locked from 5 seconds before match start until 5 minutes after it starts."
@@ -382,7 +409,12 @@ router.post("/", authRequired, async (req, res) => {
     return res.status(400).json({ error: "You have already submitted your team for the upcoming match." });
   }
 
+  const member = await League.exists({ members: req.user.id });
+
   if (existing) {
+    if (!existing.lockedInLeague && member) {
+      existing.lockedInLeague = true;
+    }
     if (existing.lockedInLeague) {
       if (inFirstSubmissionWindow) {
         // Free changes before the first submitted match starts; no transfers counted.
@@ -418,6 +450,9 @@ router.post("/", authRequired, async (req, res) => {
       }
     }
 
+    const priorSubmittedStart = existing.submittedForMatchStart
+      ? new Date(existing.submittedForMatchStart)
+      : null;
     existing.name = name;
     existing.players = uniqueIds;
     existing.captain = captainId;
@@ -426,7 +461,35 @@ router.post("/", authRequired, async (req, res) => {
     existing.submittedForDate = window.nextMatch.date || today;
     existing.submittedForMatchId = window.nextMatch.id;
     existing.submittedForMatchStart = new Date(window.nextMatch.startMs);
+    if (!existing.firstSubmittedMatchStart) {
+      if (priorSubmittedStart) {
+        existing.firstSubmittedMatchStart = priorSubmittedStart;
+      } else if (Number.isFinite(earliestStartMs)) {
+        existing.firstSubmittedMatchStart = new Date(earliestStartMs);
+      }
+    }
     await existing.save();
+
+    // Upsert submission for this match (keeps latest XI if resubmitted before start).
+    await TeamSubmission.findOneAndUpdate(
+      { user: req.user.id, matchId: window.nextMatch.id },
+      {
+        user: req.user.id,
+        team: existing._id,
+        matchId: window.nextMatch.id,
+        matchStartMs: window.nextMatch.startMs,
+        matchDate: window.nextMatch.date || today,
+        matchName: clientNextMatch?.name || null,
+        team1: clientNextMatch?.team1 || null,
+        team2: clientNextMatch?.team2 || null,
+        venue: clientNextMatch?.venue || null,
+        players: uniqueIds,
+        captain: captainId,
+        viceCaptain: viceCaptainId
+      },
+      { upsert: true, new: true }
+    );
+
     return res.json({
       id: existing._id,
       name: existing.name,
@@ -440,12 +503,12 @@ router.post("/", authRequired, async (req, res) => {
       submittedForDate: existing.submittedForDate || null,
       submittedForMatchId: existing.submittedForMatchId || null,
       submittedForMatchStart: existing.submittedForMatchStart || null,
+      firstSubmittedMatchStart: existing.firstSubmittedMatchStart || null,
       captain: existing.captain || null,
       viceCaptain: existing.viceCaptain || null
     });
   }
 
-  const member = await League.exists({ members: req.user.id });
   const transferPhase = phase;
   const team = await Team.create({
     name,
@@ -463,8 +526,28 @@ router.post("/", authRequired, async (req, res) => {
     submittedForDate: window.nextMatch.date || today,
     submittedForMatchId: window.nextMatch.id,
     submittedForMatchStart: new Date(window.nextMatch.startMs),
-    submittedAt: new Date()
+    submittedAt: new Date(),
+    firstSubmittedMatchStart: Number.isFinite(earliestStartMs) ? new Date(earliestStartMs) : null
   });
+
+  await TeamSubmission.findOneAndUpdate(
+    { user: req.user.id, matchId: window.nextMatch.id },
+    {
+      user: req.user.id,
+      team: team._id,
+      matchId: window.nextMatch.id,
+      matchStartMs: window.nextMatch.startMs,
+      matchDate: window.nextMatch.date || today,
+      matchName: clientNextMatch?.name || null,
+      team1: clientNextMatch?.team1 || null,
+      team2: clientNextMatch?.team2 || null,
+      venue: clientNextMatch?.venue || null,
+      players: uniqueIds,
+      captain: captainId,
+      viceCaptain: viceCaptainId
+    },
+    { upsert: true, new: true }
+  );
   res.json({
     id: team._id,
     name: team.name,
@@ -478,6 +561,7 @@ router.post("/", authRequired, async (req, res) => {
     submittedForDate: team.submittedForDate || null,
     submittedForMatchId: team.submittedForMatchId || null,
     submittedForMatchStart: team.submittedForMatchStart || null,
+    firstSubmittedMatchStart: team.firstSubmittedMatchStart || null,
     captain: team.captain || null,
     viceCaptain: team.viceCaptain || null
   });

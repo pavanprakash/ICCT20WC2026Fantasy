@@ -431,7 +431,8 @@ export default function TeamBuilder() {
     const max = maxRaw ? Number(maxRaw) : null;
     const minOk = min === null || !Number.isNaN(min);
     const maxOk = max === null || !Number.isNaN(max);
-    return players.filter((p) => {
+    return players
+      .filter((p) => {
       const matchQuery = !q || p.name.toLowerCase().includes(q);
       const matchTeam = teamFilter.length === 0 || teamFilter.includes(p.country);
       const matchRole = roleFilter === "all" || p.role === roleFilter;
@@ -443,6 +444,12 @@ export default function TeamBuilder() {
         matchPrice = (min === null || price >= min) && (max === null || price <= max);
       }
       return matchQuery && matchTeam && matchRole && matchPrice;
+    })
+    .sort((a, b) => {
+      const aPoints = Number(a.points ?? a.fantasyPoints ?? 0);
+      const bPoints = Number(b.points ?? b.fantasyPoints ?? 0);
+      if (bPoints !== aPoints) return bPoints - aPoints;
+      return String(a.name || "").localeCompare(String(b.name || ""));
     });
   }, [players, query, teamFilter, roleFilter, priceRange]);
 
@@ -557,7 +564,15 @@ export default function TeamBuilder() {
         captainId,
         viceCaptainId,
         nextMatch: nextMatch
-          ? { id: nextMatch.id, startMs: nextMatch.startMs, date: nextMatch.date }
+          ? {
+              id: nextMatch.id,
+              startMs: nextMatch.startMs,
+              date: nextMatch.date,
+              name: nextMatch.name,
+              team1: nextMatch.team1,
+              team2: nextMatch.team2,
+              venue: nextMatch.venue
+            }
           : null
       });
       if (res.data) {
@@ -647,7 +662,7 @@ export default function TeamBuilder() {
     <section className="page">
       <div className="page__header">
         <h2>Create Your Team</h2>
-        <p>Pick 11 players under a budget of £100m. Max 7 players from the same team.</p>
+        <p>Pick 11 players under a budget of £90m. Max 7 players from the same team.</p>
       </div>
 
       <div className="team-builder">
@@ -678,7 +693,7 @@ export default function TeamBuilder() {
               <strong>£{formatPrice(totalCost)}m / £{formatPrice(BUDGET)}m</strong>
             </div>
             <div>
-              <span className="muted">Team Points (since last submission)</span>
+              <span className="muted">Team Points</span>
               <strong>{periodPoints.loading ? "..." : totalPoints}</strong>
             </div>
             <div>

@@ -17,7 +17,8 @@ const TeamSchema = new mongoose.Schema(
     submittedForDate: { type: String },
     submittedForMatchId: { type: String },
     submittedForMatchStart: { type: Date },
-    submittedAt: { type: Date }
+    submittedAt: { type: Date },
+    firstSubmittedMatchStart: { type: Date }
   },
   { timestamps: true }
 );

@@ -35,7 +35,10 @@ const initials = (name = "") =>
 
 const formatPrice = (value) => Number(value || 0).toFixed(1);
 
-const PlayerChip = ({ player, isCaptain, isViceCaptain, canEdit, onRemove }) => (
+const PlayerChip = ({ player, isCaptain, isViceCaptain, canEdit, onRemove, pointsByName }) => {
+  const key = String(player.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const points = pointsByName?.get ? pointsByName.get(key) : null;
+  return (
   <div className="player-chip">
     <div className="player-chip__avatar">
       {initials(player.name)}
@@ -49,7 +52,8 @@ const PlayerChip = ({ player, isCaptain, isViceCaptain, canEdit, onRemove }) => 
       <div className="player-chip__name">{player.name}</div>
       <div className="player-chip__details">
         <span className="player-chip__country">{player.country || "—"}</span>
-        <span className="player-chip__price">{formatPrice(player.price)} Cr</span>
+        <span className="player-chip__price">£{formatPrice(player.price)}m</span>
+        {points != null ? <span className="player-chip__points">Pts {points}</span> : null}
       </div>
     </div>
     {canEdit && (
@@ -64,14 +68,16 @@ const PlayerChip = ({ player, isCaptain, isViceCaptain, canEdit, onRemove }) => 
       </button>
     )}
   </div>
-);
+  );
+};
 
 export default function SelectedTeamField({
   players = [],
   captainId = "",
   viceCaptainId = "",
   canEdit = false,
-  onRemove
+  onRemove,
+  pointsByName
 }) {
   const buckets = useMemo(() => roleBuckets(players), [players]);
 
@@ -89,6 +95,7 @@ export default function SelectedTeamField({
                 isViceCaptain={String(player._id) === String(viceCaptainId)}
                 canEdit={canEdit}
                 onRemove={onRemove}
+                pointsByName={pointsByName}
               />
             ))
           ) : (
@@ -109,6 +116,7 @@ export default function SelectedTeamField({
                 isViceCaptain={String(player._id) === String(viceCaptainId)}
                 canEdit={canEdit}
                 onRemove={onRemove}
+                pointsByName={pointsByName}
               />
             ))
           ) : (
@@ -129,6 +137,7 @@ export default function SelectedTeamField({
                 isViceCaptain={String(player._id) === String(viceCaptainId)}
                 canEdit={canEdit}
                 onRemove={onRemove}
+                pointsByName={pointsByName}
               />
             ))
           ) : (
@@ -149,6 +158,7 @@ export default function SelectedTeamField({
                 isViceCaptain={String(player._id) === String(viceCaptainId)}
                 canEdit={canEdit}
                 onRemove={onRemove}
+                pointsByName={pointsByName}
               />
             ))
           ) : (

@@ -4,6 +4,7 @@ import Player from "../models/Player.js";
 import Team from "../models/Team.js";
 import League from "../models/League.js";
 import User from "../models/User.js";
+import TeamSubmission from "../models/TeamSubmission.js";
 import { cricapiGet } from "../services/cricapi.js";
 import { calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
 
@@ -180,6 +181,28 @@ async function teamPointsSince(team) {
   return total;
 }
 
+async function teamPointsFromSubmissions(userId) {
+  const submissions = await TeamSubmission.find({ user: userId })
+    .populate("players")
+    .populate("captain")
+    .populate("viceCaptain")
+    .lean();
+  if (!submissions.length) return 0;
+  const matchIds = submissions.map((s) => s.matchId);
+  const pointsDocs = await FantasyMatchPoints.find({ matchId: { $in: matchIds } }).lean();
+  const pointsMap = new Map(pointsDocs.map((d) => [String(d.matchId), d.points || []]));
+  let total = 0;
+  for (const s of submissions) {
+    const points = pointsMap.get(String(s.matchId)) || [];
+    const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
+    const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
+    const capName = s.captain?.name || null;
+    const vcName = s.viceCaptain?.name || null;
+    total += totalWithCaptaincy(filtered, capName, vcName);
+  }
+  return total;
+}
+
 async function computeLeagueStandings(league) {
   const memberIds = league.members || [];
   const users = await User.find({ _id: { $in: memberIds } }).select("name").lean();
@@ -195,7 +218,7 @@ async function computeLeagueStandings(league) {
   const rows = await Promise.all(memberIds.map(async (id) => {
     const team = teamMap.get(String(id));
     const players = team?.players || [];
-    const points = team ? await teamPointsSince(team) : 0;
+    const points = team ? await teamPointsFromSubmissions(String(id)) : 0;
     return {
       userId: String(id),
       userName: userMap.get(String(id)) || "Unknown",

@@ -1,0 +1,23 @@
+import mongoose from "mongoose";
+
+const TeamSubmissionSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    team: { type: mongoose.Schema.Types.ObjectId, ref: "Team", required: true },
+    matchId: { type: String, required: true },
+    matchStartMs: { type: Number },
+    matchDate: { type: String },
+    matchName: { type: String },
+    team1: { type: String },
+    team2: { type: String },
+    venue: { type: String },
+    players: [{ type: mongoose.Schema.Types.ObjectId, ref: "Player", required: true }],
+    captain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
+    viceCaptain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null }
+  },
+  { timestamps: true }
+);
+
+TeamSubmissionSchema.index({ user: 1, matchId: 1 }, { unique: true });
+
+export default mongoose.model("TeamSubmission", TeamSubmissionSchema);
