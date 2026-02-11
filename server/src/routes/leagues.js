@@ -1,6 +1,10 @@
 import express from "express";
 import League from "../models/League.js";
 import Team from "../models/Team.js";
+import TeamSubmission from "../models/TeamSubmission.js";
+import FantasyMatchPoints from "../models/FantasyMatchPoints.js";
+import User from "../models/User.js";
+import { cricapiGet } from "../services/cricapi.js";
 import fixtures from "../data/fixtures-2026.js";
 import { buildLeagueDashboard } from "../jobs/dailyLeagueUpdate.js";
 import { authRequired } from "../middleware/auth.js";
@@ -8,7 +12,9 @@ import { authRequired } from "../middleware/auth.js";
 const router = express.Router();
 
 const GROUP_LIMIT = 120;
-const FINAL_LIMIT = 45;
+const SUPER8_LIMIT = 60;
+const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
+const CRICAPI_KEY = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
 
 function getLastGroupDate() {
   const groupDates = fixtures.filter((f) => f.stage === "Group").map((f) => f.date);
@@ -18,7 +24,7 @@ function getLastGroupDate() {
 function getTransferPhase() {
   const today = new Date().toISOString().slice(0, 10);
   const lastGroup = getLastGroupDate();
-  return today > lastGroup ? "FINAL" : "GROUP";
+  return today > lastGroup ? "SUPER8" : "GROUP";
 }
 
 
@@ -29,13 +35,108 @@ async function lockTeamForUser(userId) {
     const phase = getTransferPhase();
     team.lockedInLeague = true;
     team.transferPhase = phase;
-    team.transfersLimit = phase === "GROUP" ? GROUP_LIMIT : FINAL_LIMIT;
+    team.transfersLimit = phase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT;
     team.transfersUsedTotal = team.transfersUsedTotal ?? 0;
     team.transfersByRound = team.transfersByRound || {};
-    team.postGroupResetDone = phase === "FINAL";
+    team.postGroupResetDone = phase === "SUPER8";
     team.submittedAt = team.submittedAt || team.createdAt || new Date();
     await team.save();
   }
+}
+
+function normalizeName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getPlayerNameById(players, idOrObj) {
+  if (!idOrObj || !Array.isArray(players)) return null;
+  const id = idOrObj?._id || idOrObj;
+  const found = players.find((p) => String(p._id) === String(id));
+  return found?.name || null;
+}
+
+function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByName = new Map(), boosterPlayerNameKey = null) {
+  let total = 0;
+  const capKey = normalizeName(captainName);
+  const vcKey = normalizeName(viceName);
+  for (const p of points) {
+    const nameKey = normalizeName(p.name);
+    const base = Number(p.total || 0);
+    let multiplier = 1;
+    if (boosterType === "batsman" || boosterType === "bowler" || boosterType === "wk" || boosterType === "allrounder" || boosterType === "teamx2" || boosterType === "captainx3") {
+      const role = roleByName.get(nameKey) || "";
+      const lower = String(role).toLowerCase();
+      const isBatsman = lower.includes("bat") && !lower.includes("all");
+      const isBowler = lower.includes("bowl");
+      const isWicketkeeper = lower.includes("wk") || lower.includes("keeper");
+      const isAllRounder = lower.includes("all");
+      if (boosterType === "batsman" && isBatsman) multiplier *= 2;
+      if (boosterType === "bowler" && isBowler) multiplier *= 2;
+      if (boosterType === "wk" && isWicketkeeper) multiplier *= 2;
+      if (boosterType === "allrounder" && isAllRounder) multiplier *= 2;
+      if (boosterType === "teamx2") multiplier *= 2;
+      if (boosterType === "captainx3" && boosterPlayerNameKey && nameKey === boosterPlayerNameKey) multiplier *= 3;
+    }
+    if (capKey && nameKey === capKey) {
+      multiplier *= 2;
+    } else if (vcKey && nameKey === vcKey) {
+      multiplier *= 1.5;
+    }
+    total += base * multiplier;
+  }
+  return total;
+}
+
+function fixtureFallback(matchDate, matchStartMs) {
+  if (!matchDate && !matchStartMs) return null;
+  let dateKey = matchDate;
+  let timeKey = null;
+  if (matchStartMs) {
+    const dt = new Date(matchStartMs);
+    if (!Number.isNaN(dt.getTime())) {
+      const iso = dt.toISOString();
+      dateKey = iso.slice(0, 10);
+      timeKey = iso.slice(11, 16);
+    }
+  }
+  const candidates = fixtures.filter((f) => f.date === dateKey);
+  if (!candidates.length) return null;
+  if (timeKey) {
+    const exact = candidates.find((f) => String(f.timeGMT || f.time) === timeKey);
+    if (exact) return exact;
+  }
+  return candidates[0] || null;
+}
+
+async function buildMatchMap() {
+  if (!CRICAPI_KEY) return new Map();
+  const data = await cricapiGet("/series_info", { id: SERIES_ID }, CRICAPI_KEY);
+  const list = Array.isArray(data?.data?.matchList) ? data.data.matchList : [];
+  const map = new Map();
+  for (const match of list) {
+    if (!match?.id) continue;
+    const team1 = Array.isArray(match?.teams)
+      ? match.teams[0]
+      : match?.team1 || match?.t1 || null;
+    const team2 = Array.isArray(match?.teams)
+      ? match.teams[1]
+      : match?.team2 || match?.t2 || null;
+    const venue =
+      match?.venue ||
+      match?.venueName ||
+      match?.venueInfo?.name ||
+      null;
+    map.set(String(match.id), {
+      name: match?.name || null,
+      team1,
+      team2,
+      venue
+    });
+  }
+  return map;
 }
 
 function makeCode(length = 6) {
@@ -129,6 +230,107 @@ router.get("/:id/dashboard", authRequired, async (req, res) => {
 
   const dashboard = await buildLeagueDashboard(req.params.id);
   res.json(dashboard);
+});
+
+router.get("/:id/points/:userId", authRequired, async (req, res) => {
+  const league = await League.findById(req.params.id).lean();
+  if (!league) return res.status(404).json({ error: "League not found" });
+  const isMember = league.members?.some((m) => String(m) === String(req.user.id));
+  if (!isMember) return res.status(403).json({ error: "Not a league member" });
+
+  const targetId = String(req.params.userId || "");
+  const isTargetMember = league.members?.some((m) => String(m) === targetId);
+  if (!isTargetMember) return res.status(404).json({ error: "User not in this league" });
+
+  const user = await User.findById(targetId).select("name").lean();
+
+  const submissions = await TeamSubmission.find({ user: targetId })
+    .populate("players")
+    .populate("captain")
+    .populate("viceCaptain")
+    .sort({ matchStartMs: -1, createdAt: -1 })
+    .lean();
+
+  const needsMatchMeta = submissions.some((s) => !s.matchName || !s.team1 || !s.team2 || !s.venue);
+  const matchMap = needsMatchMeta ? await buildMatchMap() : new Map();
+
+  const matchIds = submissions.map((s) => s.matchId);
+  const pointsDocs = await FantasyMatchPoints.find({ matchId: { $in: matchIds } }).lean();
+  const pointsMap = new Map(pointsDocs.map((d) => [String(d.matchId), d.points || []]));
+
+  const rows = submissions.map((s) => {
+    const matchMeta = matchMap.get(String(s.matchId)) || {};
+    const fallback = fixtureFallback(s.matchDate, s.matchStartMs);
+    const team1 = s.team1 || matchMeta.team1 || fallback?.team1 || null;
+    const team2 = s.team2 || matchMeta.team2 || fallback?.team2 || null;
+    const venue = s.venue || matchMeta.venue || fallback?.venue || null;
+    const matchName =
+      s.matchName ||
+      matchMeta.name ||
+      (team1 && team2 ? `${team1} vs ${team2}` : null);
+    const points = pointsMap.get(String(s.matchId)) || [];
+    const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
+    const roleByName = new Map((s.players || []).map((p) => [normalizeName(p.name), p.role]));
+    const boosterPlayerName = getPlayerNameById(s.players, s.boosterPlayer);
+    const boosterPlayerKey = normalizeName(boosterPlayerName);
+    const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
+    const capName = s.captain?.name || getPlayerNameById(s.players, s.captain);
+    const vcName = s.viceCaptain?.name || getPlayerNameById(s.players, s.viceCaptain);
+    const capKey = normalizeName(capName);
+    const vcKey = normalizeName(vcName);
+    const breakdown = filtered
+      .map((p) => {
+        const key = normalizeName(p.name);
+        const base = Number(p.total || 0);
+        let multiplier = 1;
+        if (s.booster === "batsman" || s.booster === "bowler" || s.booster === "wk" || s.booster === "allrounder" || s.booster === "teamx2" || s.booster === "captainx3") {
+          const role = roleByName.get(key) || "";
+          const lower = String(role).toLowerCase();
+          const isBatsman = lower.includes("bat") && !lower.includes("all");
+          const isBowler = lower.includes("bowl");
+          const isWicketkeeper = lower.includes("wk") || lower.includes("keeper");
+          const isAllRounder = lower.includes("all");
+          if (s.booster === "batsman" && isBatsman) multiplier *= 2;
+          if (s.booster === "bowler" && isBowler) multiplier *= 2;
+          if (s.booster === "wk" && isWicketkeeper) multiplier *= 2;
+          if (s.booster === "allrounder" && isAllRounder) multiplier *= 2;
+          if (s.booster === "teamx2") multiplier *= 2;
+          if (s.booster === "captainx3" && boosterPlayerKey && key === boosterPlayerKey) multiplier *= 3;
+        }
+        if (capKey && key === capKey) multiplier *= 2;
+        else if (vcKey && key === vcKey) multiplier *= 1.5;
+        return {
+          name: p.name,
+          basePoints: base,
+          multiplier,
+          totalPoints: base * multiplier
+        };
+      })
+      .sort((a, b) => b.totalPoints - a.totalPoints);
+    const total = totalWithCaptaincy(filtered, capName, vcName, s.booster, roleByName, boosterPlayerKey || null);
+    return {
+      id: s._id,
+      matchId: s.matchId,
+      matchDate: s.matchDate || null,
+      matchStartMs: s.matchStartMs || null,
+      matchName,
+      team1,
+      team2,
+      venue,
+      booster: s.booster || null,
+      boosterPlayer: s.boosterPlayer || null,
+      totalPoints: total,
+      breakdown
+    };
+  });
+
+  res.json({
+    userId: targetId,
+    userName: user?.name || "Member",
+    leagueName: league.name,
+    submissions: rows,
+    total: rows.length
+  });
 });
 
 export default router;

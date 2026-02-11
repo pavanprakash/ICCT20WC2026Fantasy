@@ -13,6 +13,8 @@ import Rules from "./pages/Rules.jsx";
 import ViewPoints from "./pages/ViewPoints.jsx";
 import ViewSubmission from "./pages/ViewSubmission.jsx";
 import Profile from "./pages/Profile.jsx";
+import LeagueMemberPoints from "./pages/LeagueMemberPoints.jsx";
+import Contact from "./pages/Contact.jsx";
 import t20Logo from "./assets/t20-logo.png";
 
 function Navbar({ user, onLogout }) {
@@ -52,6 +54,7 @@ function Navbar({ user, onLogout }) {
         <Link to="/leaderboard">Leaderboard</Link>
         <Link to="/league">Create League</Link>
         <Link to="/profile">My Profile</Link>
+        <Link to="/contact">Contact Us</Link>
       </nav>
       <div className="nav__auth">
         {user ? (
@@ -98,6 +101,7 @@ function Navbar({ user, onLogout }) {
             <Link to="/leaderboard">Leaderboard</Link>
             <Link to="/league">Create League</Link>
             <Link to="/profile">My Profile</Link>
+            <Link to="/contact">Contact Us</Link>
           </nav>
           <div className="nav-drawer__auth">
             {user ? (
@@ -193,6 +197,11 @@ export default function App() {
             path="/league/:id"
             element={user ? <LeagueDashboard /> : <Navigate to="/auth" />}
           />
+          <Route
+            path="/league/:id/points/:userId"
+            element={user ? <LeagueMemberPoints /> : <Navigate to="/auth" />}
+          />
+          <Route path="/contact" element={<Contact />} />
           <Route
             path="/auth"
             element={user ? <Navigate to="/leaderboard" /> : <Auth onAuth={handleAuth} />}

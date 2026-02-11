@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../api.js";
 
 export default function Leaderboard() {
@@ -56,7 +57,11 @@ export default function Leaderboard() {
                     <span>#{row.rank}</span>
                     <span>{row.userName}</span>
                     <span>{row.teamName}</span>
-                    <span>{row.points}</span>
+                    <span>
+                      <Link to={`/league/${league.id}/points/${row.userId}`} className="link link--points">
+                        {row.points}
+                      </Link>
+                    </span>
                   </div>
                 ))}
               </div>

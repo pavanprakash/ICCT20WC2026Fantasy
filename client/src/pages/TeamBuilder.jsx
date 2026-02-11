@@ -515,7 +515,7 @@ export default function TeamBuilder() {
     }
 
     if (totalCost + player.price > BUDGET) {
-      setStatus("Budget exceeded. Remove a player first.");
+      setStatus(`Budget exceeded. Max is £${formatPrice(BUDGET)}m.`);
       return;
     }
     setSelected([...selected, id]);

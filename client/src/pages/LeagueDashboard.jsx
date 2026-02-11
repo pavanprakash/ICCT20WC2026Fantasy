@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import api from "../api.js";
 
 const formatDateTime = (value) => {
@@ -63,7 +63,11 @@ export default function LeagueDashboard() {
                 <span>#{row.rank}</span>
                 <span>{row.userName}</span>
                 <span>{row.teamName}</span>
-                <span>{row.points}</span>
+                <span>
+                  <Link to={`/league/${id}/points/${row.userId}`} className="link link--points">
+                    {row.points}
+                  </Link>
+                </span>
               </div>
             ))}
             {(!league.standings || league.standings.length === 0) && (
