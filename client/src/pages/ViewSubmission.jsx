@@ -61,6 +61,9 @@ export default function ViewSubmission() {
           <p>Loading submission...</p>
         )}
       </div>
+      {submission?.booster ? (
+        <div className="notice notice--success">Batsmen Booster applied for this fixture.</div>
+      ) : null}
 
       <div className="muted">
         <Link to="/points">← Back to View Points</Link>
@@ -71,9 +74,9 @@ export default function ViewSubmission() {
       {submission && (
         <>
           <div className="panel-block">
-            <div className="panel-title">Total Points</div>
-            <div className="muted">{submission.totalPoints}</div>
-          </div>
+              <div className="panel-title">Total Points</div>
+              <div className="muted">{submission.totalPoints}</div>
+            </div>
           {submission.breakdown && submission.breakdown.length ? (
             <div className="panel-block">
               <div className="panel-title">Points Breakdown</div>

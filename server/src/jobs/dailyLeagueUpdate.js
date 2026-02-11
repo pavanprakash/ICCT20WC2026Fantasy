@@ -19,6 +19,13 @@ function normalizeName(value) {
     .trim();
 }
 
+function getPlayerNameById(players, idOrObj) {
+  if (!idOrObj || !Array.isArray(players)) return null;
+  const id = idOrObj?._id || idOrObj;
+  const found = players.find((p) => String(p._id) === String(id));
+  return found?.name || null;
+}
+
 function isCompletedMatch(match) {
   if (match?.matchEnded === true) return true;
   const ms = String(match?.ms || "").toLowerCase();
@@ -138,20 +145,34 @@ function teamPoints(players) {
   }, 0);
 }
 
-function totalWithCaptaincy(points, captainName, viceName) {
+function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByName = new Map(), boosterPlayerNameKey = null) {
   let total = 0;
   const capKey = normalizeName(captainName);
   const vcKey = normalizeName(viceName);
   for (const p of points) {
     const nameKey = normalizeName(p.name);
     const base = Number(p.total || 0);
-    if (capKey && nameKey === capKey) {
-      total += base * 2;
-    } else if (vcKey && nameKey === vcKey) {
-      total += base * 1.5;
-    } else {
-      total += base;
+    let multiplier = 1;
+    if (boosterType === "batsman" || boosterType === "bowler" || boosterType === "wk" || boosterType === "allrounder" || boosterType === "teamx2" || boosterType === "captainx3") {
+      const role = roleByName.get(nameKey) || "";
+      const lower = String(role).toLowerCase();
+      const isBatsman = lower.includes("bat") && !lower.includes("all");
+      const isBowler = lower.includes("bowl");
+      const isWicketkeeper = lower.includes("wk") || lower.includes("keeper");
+      const isAllRounder = lower.includes("all");
+      if (boosterType === "batsman" && isBatsman) multiplier *= 2;
+      if (boosterType === "bowler" && isBowler) multiplier *= 2;
+      if (boosterType === "wk" && isWicketkeeper) multiplier *= 2;
+      if (boosterType === "allrounder" && isAllRounder) multiplier *= 2;
+      if (boosterType === "teamx2") multiplier *= 2;
+      if (boosterType === "captainx3" && boosterPlayerNameKey && nameKey === boosterPlayerNameKey) multiplier *= 3;
     }
+    if (capKey && nameKey === capKey) {
+      multiplier *= 2;
+    } else if (vcKey && nameKey === vcKey) {
+      multiplier *= 1.5;
+    }
+    total += base * multiplier;
   }
   return total;
 }
@@ -176,7 +197,7 @@ async function teamPointsSince(team) {
   for (const doc of docs) {
     const points = Array.isArray(doc.points) ? doc.points : [];
     const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
-    total += totalWithCaptaincy(filtered, team?.captain?.name, team?.viceCaptain?.name);
+    total += totalWithCaptaincy(filtered, team?.captain?.name, team?.viceCaptain?.name, null, new Map(), null);
   }
   return total;
 }
@@ -195,10 +216,13 @@ async function teamPointsFromSubmissions(userId) {
   for (const s of submissions) {
     const points = pointsMap.get(String(s.matchId)) || [];
     const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
+    const roleByName = new Map((s.players || []).map((p) => [normalizeName(p.name), p.role]));
+    const boosterPlayerName = getPlayerNameById(s.players, s.boosterPlayer);
+    const boosterPlayerKey = normalizeName(boosterPlayerName);
     const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
     const capName = s.captain?.name || null;
     const vcName = s.viceCaptain?.name || null;
-    total += totalWithCaptaincy(filtered, capName, vcName);
+    total += totalWithCaptaincy(filtered, capName, vcName, s.booster, roleByName, boosterPlayerKey || null);
   }
   return total;
 }

@@ -69,6 +69,16 @@ const RULES = [
       { label: "In Announced Lineups", value: "+4 pts" },
       { label: "Playing Substitute", value: "+4 pts" }
     ]
+  },
+  {
+    title: "Transfers",
+    items: [
+      { label: "Free changes before your first match starts", value: "" },
+      { label: "Transfers count after your first submitted match begins", value: "" },
+      { label: "Group stage transfer limit", value: "120" },
+      { label: "Finals transfer limit", value: "45" },
+      { label: "Transfers are locked 5 seconds before match start until 5 minutes after", value: "" }
+    ]
   }
 ];
 

@@ -28,20 +28,41 @@ function normalizeName(value) {
     .trim();
 }
 
-function totalWithCaptaincy(points, captainName, viceName) {
+function getPlayerNameById(players, idOrObj) {
+  if (!idOrObj || !Array.isArray(players)) return null;
+  const id = idOrObj?._id || idOrObj;
+  const found = players.find((p) => String(p._id) === String(id));
+  return found?.name || null;
+}
+
+function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByName = new Map(), boosterPlayerNameKey = null) {
   let total = 0;
   const capKey = normalizeName(captainName);
   const vcKey = normalizeName(viceName);
   for (const p of points) {
     const nameKey = normalizeName(p.name);
     const base = Number(p.total || 0);
-    if (capKey && nameKey === capKey) {
-      total += base * 2;
-    } else if (vcKey && nameKey === vcKey) {
-      total += base * 1.5;
-    } else {
-      total += base;
+    let multiplier = 1;
+    if (boosterType === "batsman" || boosterType === "bowler" || boosterType === "wk" || boosterType === "allrounder" || boosterType === "teamx2" || boosterType === "captainx3") {
+      const role = roleByName.get(nameKey) || "";
+      const lower = String(role).toLowerCase();
+      const isBatsman = lower.includes("bat") && !lower.includes("all");
+      const isBowler = lower.includes("bowl");
+      const isWicketkeeper = lower.includes("wk") || lower.includes("keeper");
+      const isAllRounder = lower.includes("all");
+      if (boosterType === "batsman" && isBatsman) multiplier *= 2;
+      if (boosterType === "bowler" && isBowler) multiplier *= 2;
+      if (boosterType === "wk" && isWicketkeeper) multiplier *= 2;
+      if (boosterType === "allrounder" && isAllRounder) multiplier *= 2;
+      if (boosterType === "teamx2") multiplier *= 2;
+      if (boosterType === "captainx3" && boosterPlayerNameKey && nameKey === boosterPlayerNameKey) multiplier *= 3;
     }
+    if (capKey && nameKey === capKey) {
+      multiplier *= 2;
+    } else if (vcKey && nameKey === vcKey) {
+      multiplier *= 1.5;
+    }
+    total += base * multiplier;
   }
   return total;
 }
@@ -66,7 +87,14 @@ async function teamPointsSince(team) {
   for (const doc of docs) {
     const points = Array.isArray(doc.points) ? doc.points : [];
     const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
-    total += totalWithCaptaincy(filtered, team?.captain?.name, team?.viceCaptain?.name);
+    total += totalWithCaptaincy(
+      filtered,
+      team?.captain?.name,
+      team?.viceCaptain?.name,
+      null,
+      new Map(),
+      null
+    );
   }
   return total;
 }
@@ -85,8 +113,18 @@ async function teamPointsFromSubmissions(userId) {
   for (const s of submissions) {
     const points = pointsMap.get(String(s.matchId)) || [];
     const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
+    const roleByName = new Map((s.players || []).map((p) => [normalizeName(p.name), p.role]));
+    const boosterPlayerName = getPlayerNameById(s.players, s.boosterPlayer);
+    const boosterPlayerKey = normalizeName(boosterPlayerName);
     const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
-    total += totalWithCaptaincy(filtered, s.captain?.name, s.viceCaptain?.name);
+    total += totalWithCaptaincy(
+      filtered,
+      s.captain?.name,
+      s.viceCaptain?.name,
+      s.booster,
+      roleByName,
+      boosterPlayerKey || null
+    );
   }
   return total;
 }
@@ -101,7 +139,7 @@ function diffTransfers(oldIds, newIds) {
 }
 
 const GROUP_LIMIT = 120;
-const FINAL_LIMIT = 45;
+const SUPER8_LIMIT = 60;
 const LOCK_BEFORE_SECONDS = 5;
 const LOCK_AFTER_MINUTES = 5;
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
@@ -235,7 +273,7 @@ function getLastGroupDate() {
 function getTransferPhase() {
   const today = new Date().toISOString().slice(0, 10);
   const lastGroup = getLastGroupDate();
-  return today > lastGroup ? "FINAL" : "GROUP";
+  return today > lastGroup ? "SUPER8" : "GROUP";
 }
 
 router.get("/leaderboard", async (req, res) => {
@@ -270,11 +308,15 @@ router.get("/me", authRequired, async (req, res) => {
     players: team.players,
     points: teamPoints(team.players || []),
     lockedInLeague: team.lockedInLeague || false,
-    transfersLimit: team.transfersLimit ?? (phase === "FINAL" ? FINAL_LIMIT : GROUP_LIMIT),
+    transfersLimit: team.transfersLimit ?? (phase === "SUPER8" ? SUPER8_LIMIT : GROUP_LIMIT),
     transfersUsedTotal: team.transfersUsedTotal ?? 0,
     transfersByRound: team.transfersByRound || {},
     transferPhase: phase,
     postGroupResetDone: team.postGroupResetDone || false,
+    boosterUsed: team.boosterUsed || false,
+    boosterType: team.boosterType || null,
+    usedBoosters: team.usedBoosters || [],
+    boosterPlayer: team.boosterPlayer || null,
     lastSubmissionDate: team.lastSubmissionDate || null,
     submittedForDate: team.submittedForDate || null,
     submittedForMatchId: team.submittedForMatchId || null,
@@ -287,9 +329,25 @@ router.get("/me", authRequired, async (req, res) => {
 });
 
 router.post("/", authRequired, async (req, res) => {
-  const { name, playerIds, captainId, viceCaptainId, nextMatch: clientNextMatch } = req.body;
+  const { name, playerIds, captainId, viceCaptainId, booster, boosterPlayerId, nextMatch: clientNextMatch } = req.body;
   if (!name || !Array.isArray(playerIds)) {
     return res.status(400).json({ error: "Missing fields" });
+  }
+  const boosterType = booster ? String(booster).toLowerCase() : null;
+  if (boosterType && boosterType !== "batsman" && boosterType !== "bowler" && boosterType !== "wk" && boosterType !== "allrounder" && boosterType !== "teamx2" && boosterType !== "captainx3") {
+    return res.status(400).json({ error: "Invalid booster selection" });
+  }
+  if (boosterType === "captainx3") {
+    if (!boosterPlayerId) {
+      return res.status(400).json({ error: "Select a player for CAPTAIN X3 booster." });
+    }
+    const inXi = uniqueIds.map(String).includes(String(boosterPlayerId));
+    if (!inXi) {
+      return res.status(400).json({ error: "CAPTAIN X3 player must be in your XI." });
+    }
+    if (String(boosterPlayerId) === String(captainId) || String(boosterPlayerId) === String(viceCaptainId)) {
+      return res.status(400).json({ error: "CAPTAIN X3 player cannot be captain or vice-captain." });
+    }
   }
 
   const uniqueIds = [...new Set(playerIds)];
@@ -401,12 +459,10 @@ router.post("/", authRequired, async (req, res) => {
   if (!window.nextMatch) {
     return res.status(403).json({ error: "No upcoming matches available for submission." });
   }
-  if (
-    existing?.submittedForMatchId &&
-    existing.submittedForMatchId === window.nextMatch.id &&
-    !inFirstSubmissionWindow
-  ) {
-    return res.status(400).json({ error: "You have already submitted your team for the upcoming match." });
+  if (existing?.submittedForMatchId && existing.submittedForMatchId === window.nextMatch.id) {
+    if (window.locked) {
+      return res.status(400).json({ error: "You have already submitted your team for the upcoming match." });
+    }
   }
 
   const member = await League.exists({ members: req.user.id });
@@ -415,18 +471,22 @@ router.post("/", authRequired, async (req, res) => {
     if (!existing.lockedInLeague && member) {
       existing.lockedInLeague = true;
     }
+    const usedBoosters = Array.isArray(existing.usedBoosters) ? existing.usedBoosters : [];
+    if (boosterType && usedBoosters.includes(boosterType)) {
+      return res.status(400).json({ error: "Booster already used for this tournament." });
+    }
     if (existing.lockedInLeague) {
       if (inFirstSubmissionWindow) {
         // Free changes before the first submitted match starts; no transfers counted.
-      } else if (phase === "FINAL" && !existing.postGroupResetDone) {
-        // One-time post-group reset: unlimited transfers before final phase cap applies
-        existing.transfersLimit = FINAL_LIMIT;
+      } else if (phase === "SUPER8" && !existing.postGroupResetDone) {
+        // One-time post-group reset: unlimited transfers before Super 8 cap applies
+        existing.transfersLimit = SUPER8_LIMIT;
         existing.transfersUsedTotal = 0;
         existing.transfersByRound = {};
         existing.postGroupResetDone = true;
-        existing.transferPhase = "FINAL";
+        existing.transferPhase = "SUPER8";
       } else {
-        const limit = phase === "GROUP" ? GROUP_LIMIT : FINAL_LIMIT;
+        const limit = phase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT;
         existing.transfersLimit = limit;
         existing.transferPhase = phase;
 
@@ -457,6 +517,12 @@ router.post("/", authRequired, async (req, res) => {
     existing.players = uniqueIds;
     existing.captain = captainId;
     existing.viceCaptain = viceCaptainId;
+    if (boosterType) {
+      existing.boosterUsed = true;
+      existing.boosterType = boosterType;
+      existing.usedBoosters = Array.from(new Set([...(usedBoosters || []), boosterType]));
+      existing.boosterPlayer = boosterType === "captainx3" ? boosterPlayerId : null;
+    }
     existing.lastSubmissionDate = today;
     existing.submittedForDate = window.nextMatch.date || today;
     existing.submittedForMatchId = window.nextMatch.id;
@@ -484,6 +550,8 @@ router.post("/", authRequired, async (req, res) => {
         team2: clientNextMatch?.team2 || null,
         venue: clientNextMatch?.venue || null,
         players: uniqueIds,
+        booster: boosterType,
+        boosterPlayer: boosterType === "captainx3" ? boosterPlayerId : null,
         captain: captainId,
         viceCaptain: viceCaptainId
       },
@@ -493,12 +561,16 @@ router.post("/", authRequired, async (req, res) => {
     return res.json({
       id: existing._id,
       name: existing.name,
-      transfersLimit: existing.transfersLimit ?? (phase === "GROUP" ? GROUP_LIMIT : FINAL_LIMIT),
+      transfersLimit: existing.transfersLimit ?? (phase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT),
       transfersUsedTotal: existing.transfersUsedTotal ?? 0,
       lockedInLeague: existing.lockedInLeague || false,
       transfersByRound: existing.transfersByRound || {},
       transferPhase: existing.transferPhase || phase,
       postGroupResetDone: existing.postGroupResetDone || false,
+      boosterUsed: existing.boosterUsed || false,
+      boosterType: existing.boosterType || null,
+      usedBoosters: existing.usedBoosters || [],
+      boosterPlayer: existing.boosterPlayer || null,
       lastSubmissionDate: existing.lastSubmissionDate || null,
       submittedForDate: existing.submittedForDate || null,
       submittedForMatchId: existing.submittedForMatchId || null,
@@ -517,11 +589,15 @@ router.post("/", authRequired, async (req, res) => {
     captain: captainId,
     viceCaptain: viceCaptainId,
     lockedInLeague: Boolean(member),
-    transfersLimit: transferPhase === "GROUP" ? GROUP_LIMIT : FINAL_LIMIT,
+    transfersLimit: transferPhase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT,
     transfersUsedTotal: 0,
     transfersByRound: {},
     transferPhase,
-    postGroupResetDone: transferPhase === "FINAL",
+    postGroupResetDone: transferPhase === "SUPER8",
+    boosterUsed: Boolean(boosterType),
+    boosterType: boosterType || null,
+    usedBoosters: boosterType ? [boosterType] : [],
+    boosterPlayer: boosterType === "captainx3" ? boosterPlayerId : null,
     lastSubmissionDate: today,
     submittedForDate: window.nextMatch.date || today,
     submittedForMatchId: window.nextMatch.id,
@@ -543,6 +619,8 @@ router.post("/", authRequired, async (req, res) => {
       team2: clientNextMatch?.team2 || null,
       venue: clientNextMatch?.venue || null,
       players: uniqueIds,
+      booster: boosterType,
+      boosterPlayer: boosterType === "captainx3" ? boosterPlayerId : null,
       captain: captainId,
       viceCaptain: viceCaptainId
     },
@@ -551,12 +629,16 @@ router.post("/", authRequired, async (req, res) => {
   res.json({
     id: team._id,
     name: team.name,
-    transfersLimit: team.transfersLimit ?? (transferPhase === "GROUP" ? GROUP_LIMIT : FINAL_LIMIT),
+    transfersLimit: team.transfersLimit ?? (transferPhase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT),
     transfersUsedTotal: team.transfersUsedTotal ?? 0,
     lockedInLeague: team.lockedInLeague || false,
     transfersByRound: team.transfersByRound || {},
     transferPhase: team.transferPhase || transferPhase,
     postGroupResetDone: team.postGroupResetDone || false,
+    boosterUsed: team.boosterUsed || false,
+    boosterType: team.boosterType || null,
+    usedBoosters: team.usedBoosters || [],
+    boosterPlayer: team.boosterPlayer || null,
     lastSubmissionDate: team.lastSubmissionDate || null,
     submittedForDate: team.submittedForDate || null,
     submittedForMatchId: team.submittedForMatchId || null,

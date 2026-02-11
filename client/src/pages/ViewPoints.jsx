@@ -73,6 +73,7 @@ export default function ViewPoints() {
                   <Link to={`/points/${row.id}`} className="link link--points">
                     {row.totalPoints}
                   </Link>
+                  {row.booster ? <span className="booster-flag">Booster</span> : null}
                 </span>
               </div>
             );

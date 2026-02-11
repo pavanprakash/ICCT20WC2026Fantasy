@@ -2,8 +2,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "../api.js";
 import fixtures from "../data/fixtures-2026.js";
 import SelectedTeamField from "../components/SelectedTeamField.jsx";
+import batsmanBooster from "../assets/Batsman-Booster.png";
+import bowlerBooster from "../assets/Bowler-Booster.png";
+import wkBooster from "../assets/Booster-Wk.png";
+import allRounderBooster from "../assets/AllRounderBooster.png";
+import teamX2Booster from "../assets/TeamX2.svg";
+import captainX3Booster from "../assets/CAPT-X3.svg";
 
-const BUDGET = 90;
+const BUDGET = 100;
 const TEAM_SIZE = 11;
 const MAX_PER_TEAM = 7;
 const ROLE_LIMITS = {
@@ -54,6 +60,14 @@ const computeMatchWindow = (matches) => {
   return { list, lockMatch, nextMatch };
 };
 
+const roleKey = (player) => {
+  const role = String(player?.role || "").toLowerCase();
+  if (role.includes("wk") || role.includes("keeper")) return "wk";
+  if (role.includes("all")) return "ar";
+  if (role.includes("bowl")) return "bowl";
+  return "bat";
+};
+
 export default function TeamBuilder() {
   const statusRef = React.useRef(null);
   const [players, setPlayers] = useState([]);
@@ -79,6 +93,8 @@ export default function TeamBuilder() {
   const [periodPoints, setPeriodPoints] = useState({ total: 0, matches: 0, loading: true });
   const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
   const [playersStatus, setPlayersStatus] = useState("loading");
+  const [boosterSelected, setBoosterSelected] = useState(null);
+  const [boosterPlayerId, setBoosterPlayerId] = useState("");
 
   const refreshPlayers = async (shouldApply = () => true) => {
     const res = await api.get("/players");
@@ -112,6 +128,9 @@ export default function TeamBuilder() {
             viceCaptainId: t.data.viceCaptain ? String(t.data.viceCaptain) : ""
           });
           setIsEditing(false);
+        const usedBoosters = Array.isArray(t.data.usedBoosters) && t.data.usedBoosters.length
+          ? t.data.usedBoosters
+          : (t.data.boosterUsed && t.data.boosterType ? [t.data.boosterType] : []);
         setTeamMeta({
           lockedInLeague: t.data.lockedInLeague || false,
           transfersLimit: t.data.transfersLimit ?? 120,
@@ -121,8 +140,13 @@ export default function TeamBuilder() {
           lastSubmissionDate: t.data.lastSubmissionDate || null,
           submittedForDate: t.data.submittedForDate || null,
           submittedForMatchId: t.data.submittedForMatchId || null,
-          submittedForMatchStart: t.data.submittedForMatchStart || null
+          submittedForMatchStart: t.data.submittedForMatchStart || null,
+          boosterUsed: t.data.boosterUsed || false,
+          boosterType: t.data.boosterType || null,
+          usedBoosters
         });
+        setBoosterSelected(null);
+        setBoosterPlayerId(t.data.boosterPlayer ? String(t.data.boosterPlayer) : "");
         } else {
           setTeamMeta(null);
           setSavedTeam({ players: [], captainId: "", viceCaptainId: "" });
@@ -558,11 +582,28 @@ export default function TeamBuilder() {
         focusStatus("Select a captain and a vice-captain.");
         return;
       }
+      const usedBoosters = teamMeta?.usedBoosters || [];
+      const boosterPayload = usedBoosters.includes(boosterSelected) ? null : boosterSelected;
+      const boosterPlayerPayload =
+        boosterPayload === "captainx3" ? boosterPlayerId || "" : "";
+      if (boosterPayload === "captainx3") {
+        if (!boosterPlayerPayload) {
+          focusStatus("Select a player for CAPTAIN X3 booster.");
+          return;
+        }
+        if (String(boosterPlayerPayload) === String(captainId) || String(boosterPlayerPayload) === String(viceCaptainId)) {
+          focusStatus("CAPTAIN X3 player cannot be captain or vice-captain.");
+          return;
+        }
+      }
+
       const res = await api.post("/teams", {
         name: teamName,
         playerIds: selected,
         captainId,
         viceCaptainId,
+        booster: boosterPayload,
+        boosterPlayerId: boosterPlayerPayload || null,
         nextMatch: nextMatch
           ? {
               id: nextMatch.id,
@@ -585,7 +626,11 @@ export default function TeamBuilder() {
           postGroupResetDone: res.data.postGroupResetDone ?? prev?.postGroupResetDone ?? false,
           lastSubmissionDate: res.data.lastSubmissionDate ?? prev?.lastSubmissionDate ?? null,
           submittedForMatchId: res.data.submittedForMatchId ?? prev?.submittedForMatchId ?? null,
-          submittedForMatchStart: res.data.submittedForMatchStart ?? prev?.submittedForMatchStart ?? null
+          submittedForMatchStart: res.data.submittedForMatchStart ?? prev?.submittedForMatchStart ?? null,
+          boosterUsed: res.data.boosterUsed ?? prev?.boosterUsed ?? false,
+          boosterType: res.data.boosterType ?? prev?.boosterType ?? null,
+          usedBoosters: res.data.usedBoosters ?? prev?.usedBoosters ?? [],
+          boosterPlayer: res.data.boosterPlayer ?? prev?.boosterPlayer ?? null
         }));
         setSavedTeam({
           players: [...selected],
@@ -600,6 +645,139 @@ export default function TeamBuilder() {
     }
   };
 
+  const usedBoosters = teamMeta?.usedBoosters || [];
+  const boosterDisabled = !isEditing;
+  const boosterLabel = (type) => {
+    switch (type) {
+      case "batsman":
+        return "Batsmen Booster";
+      case "bowler":
+        return "Bowler Booster";
+      case "wk":
+        return "Wicket-Keeper Booster";
+      case "allrounder":
+        return "All-Rounder Booster";
+      case "teamx2":
+        return "Team X2";
+      case "captainx3":
+        return "CAPTAIN X3";
+      default:
+        return "Booster";
+    }
+  };
+
+  const handleBoosterToggle = (type) => {
+    if (boosterDisabled || usedBoosters.includes(type)) return;
+    if (boosterSelected === type) {
+      setBoosterSelected(null);
+      setBoosterPlayerId("");
+      setStatus(`${boosterLabel(type)} removed.`);
+      setTimeout(() => {
+        statusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 0);
+      return;
+    }
+    setBoosterSelected(type);
+    setStatus(`${boosterLabel(type)} applied. Submit team to confirm.`);
+    setTimeout(() => {
+      statusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+  };
+
+  const autoPopulateTeam = () => {
+    if (teamMeta && !isEditing) {
+      setStatus("Click Update Team to make changes.");
+      return;
+    }
+    if (!players.length) {
+      setStatus("Players not loaded yet.");
+      return;
+    }
+
+    const budget = BUDGET;
+    const selectedIds = new Set();
+    const roleCountsLocal = { bat: 0, bowl: 0, wk: 0, ar: 0 };
+    const teamCountsLocal = {};
+    let totalCostLocal = 0;
+
+    const candidates = players.map((p) => ({
+      ...p,
+      roleKey: roleKey(p),
+      pointsValue: Number(p.points ?? p.fantasyPoints ?? 0),
+      priceValue: Number(p.price ?? 0)
+    }));
+
+    const canAdd = (p) => {
+      if (selectedIds.has(p._id)) return false;
+      if (roleCountsLocal[p.roleKey] >= ROLE_LIMITS[p.roleKey]) return false;
+      const count = teamCountsLocal[p.country] || 0;
+      if (count >= MAX_PER_TEAM) return false;
+      if (totalCostLocal + p.priceValue > budget) return false;
+      return true;
+    };
+
+    const addPlayer = (p) => {
+      selectedIds.add(p._id);
+      roleCountsLocal[p.roleKey] += 1;
+      teamCountsLocal[p.country] = (teamCountsLocal[p.country] || 0) + 1;
+      totalCostLocal += p.priceValue;
+    };
+
+    // Fill minimum role requirements first.
+    const byRole = {
+      wk: candidates.filter((p) => p.roleKey === "wk").sort((a, b) => b.pointsValue - a.pointsValue),
+      bat: candidates.filter((p) => p.roleKey === "bat").sort((a, b) => b.pointsValue - a.pointsValue),
+      ar: candidates.filter((p) => p.roleKey === "ar").sort((a, b) => b.pointsValue - a.pointsValue),
+      bowl: candidates.filter((p) => p.roleKey === "bowl").sort((a, b) => b.pointsValue - a.pointsValue)
+    };
+
+    const fillRole = (key, min) => {
+      for (const p of byRole[key]) {
+        if (roleCountsLocal[key] >= min) break;
+        if (canAdd(p)) addPlayer(p);
+      }
+    };
+
+    fillRole("wk", ROLE_MIN.wk);
+    fillRole("bat", ROLE_MIN.bat);
+    fillRole("ar", ROLE_MIN.ar);
+    fillRole("bowl", ROLE_MIN.bowl);
+
+    const allSorted = candidates.slice().sort((a, b) => b.pointsValue - a.pointsValue);
+    for (const p of allSorted) {
+      if (selectedIds.size >= TEAM_SIZE) break;
+      if (canAdd(p)) addPlayer(p);
+    }
+
+    if (selectedIds.size < TEAM_SIZE) {
+      // Second pass: prefer value picks if still short.
+      const valueSorted = candidates.slice().sort((a, b) => {
+        const aScore = a.priceValue ? a.pointsValue / a.priceValue : a.pointsValue;
+        const bScore = b.priceValue ? b.pointsValue / b.priceValue : b.pointsValue;
+        return bScore - aScore;
+      });
+      for (const p of valueSorted) {
+        if (selectedIds.size >= TEAM_SIZE) break;
+        if (canAdd(p)) addPlayer(p);
+      }
+    }
+
+    if (selectedIds.size !== TEAM_SIZE) {
+      setStatus("Unable to auto-populate within budget and rules. Try again or adjust filters.");
+      return;
+    }
+
+    const selectedList = candidates.filter((p) => selectedIds.has(p._id));
+    const sortedByPoints = selectedList.slice().sort((a, b) => b.pointsValue - a.pointsValue);
+    const cap = sortedByPoints[0]?._id || "";
+    const vc = sortedByPoints[1]?._id || "";
+
+    setSelected(Array.from(selectedIds));
+    setCaptainId(cap ? String(cap) : "");
+    setViceCaptainId(vc ? String(vc) : "");
+    setStatus("Team auto-populated.");
+  };
+
   useEffect(() => {
     const selectedSet = new Set(selected.map(String));
     if (captainId && !selectedSet.has(String(captainId))) {
@@ -607,6 +785,14 @@ export default function TeamBuilder() {
     }
     if (viceCaptainId && !selectedSet.has(String(viceCaptainId))) {
       setViceCaptainId("");
+    }
+    if (boosterSelected === "captainx3" && boosterPlayerId) {
+      if (String(captainId) === String(boosterPlayerId)) {
+        setCaptainId("");
+      }
+      if (String(viceCaptainId) === String(boosterPlayerId)) {
+        setViceCaptainId("");
+      }
     }
   }, [selected, captainId, viceCaptainId]);
 
@@ -632,6 +818,12 @@ export default function TeamBuilder() {
     return () => clearInterval(tick);
   }, [teamMeta, isEditing]);
 
+  useEffect(() => {
+    if (isEditing) return;
+    setBoosterSelected(null);
+    setBoosterPlayerId(teamMeta?.boosterPlayer ? String(teamMeta?.boosterPlayer) : "");
+  }, [isEditing, teamMeta?.boosterPlayer]);
+
   const handleRemove = (id) => {
     if (teamMeta && !isEditing) {
       setStatus("Click Update Team to make changes.");
@@ -648,6 +840,13 @@ export default function TeamBuilder() {
   }, [editSecondsLeft]);
 
   useEffect(() => {
+    if (!status) return;
+    setTimeout(() => {
+      statusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+  }, [status]);
+
+  useEffect(() => {
     if (!teamDropdownOpen) return;
     const handleClick = (e) => {
       if (!e.target.closest(".multi-select")) {
@@ -662,7 +861,7 @@ export default function TeamBuilder() {
     <section className="page">
       <div className="page__header">
         <h2>Create Your Team</h2>
-        <p>Pick 11 players under a budget of £90m. Max 7 players from the same team.</p>
+        <p>Pick 11 players under a budget of £100m. Max 7 players from the same team.</p>
       </div>
 
       <div className="team-builder">
@@ -747,6 +946,11 @@ export default function TeamBuilder() {
           ) : (
             <div className="transfer-summary muted">Unlimited transfers until you submit a team into a league.</div>
           )}
+          {!teamMeta?.submittedForMatchId && (
+            <button className="btn btn--primary" type="button" onClick={autoPopulateTeam}>
+              Auto Populate Team
+            </button>
+          )}
           <div className="panel-block">
             <div className="filter-group">
               <label className="label">Captain</label>
@@ -754,10 +958,15 @@ export default function TeamBuilder() {
                 className="input"
                 value={captainId}
                 onChange={(e) => setCaptainId(e.target.value)}
+                disabled={Boolean(teamMeta) && !isEditing}
               >
                 <option value="">Select captain</option>
                 {selectedPlayers.map((player) => (
-                  <option key={`cap-${player._id}`} value={player._id}>
+                  <option
+                    key={`cap-${player._id}`}
+                    value={player._id}
+                    disabled={boosterSelected === "captainx3" && String(boosterPlayerId) === String(player._id)}
+                  >
                     {player.name}
                   </option>
                 ))}
@@ -769,10 +978,15 @@ export default function TeamBuilder() {
                 className="input"
                 value={viceCaptainId}
                 onChange={(e) => setViceCaptainId(e.target.value)}
+                disabled={Boolean(teamMeta) && !isEditing}
               >
                 <option value="">Select vice-captain</option>
                 {selectedPlayers.map((player) => (
-                  <option key={`vc-${player._id}`} value={player._id}>
+                  <option
+                    key={`vc-${player._id}`}
+                    value={player._id}
+                    disabled={boosterSelected === "captainx3" && String(boosterPlayerId) === String(player._id)}
+                  >
                     {player.name}
                   </option>
                 ))}
@@ -824,7 +1038,6 @@ export default function TeamBuilder() {
             }
           >
             {teamMeta && !isEditing ? "Update Team" : selected.length > 0 ? "Submit Team" : "Select Team"}
-            {teamMeta && isEditing ? ` (${editTimerLabel})` : ""}
           </button>
           {teamMeta && isEditing ? (
             <button
@@ -846,6 +1059,205 @@ export default function TeamBuilder() {
         </div>
 
         <div>
+          <div className="panel-block booster-panel">
+            <div className="panel-title">Choose a Booster</div>
+            <div className="booster-grid">
+              <div
+                className={`booster-card ${boosterSelected === "batsman" ? "booster-card--active" : ""} ${usedBoosters.includes("batsman") ? "booster-card--used" : ""}`}
+                aria-disabled={boosterDisabled || usedBoosters.includes("batsman")}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleBoosterToggle("batsman")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleBoosterToggle("batsman");
+                  }
+                }}
+              >
+                <img
+                  src={batsmanBooster}
+                  alt="Batsmen Booster"
+                  className="booster-card__image"
+                  title={teamMeta?.boosterUsed ? "Booster already used for this tournament." : "Apply Batsmen Booster"}
+                />
+                <div className="booster-card__meta">
+                  <strong>Batsmen Booster</strong>
+                  <span>2x points for all batsmen</span>
+                </div>
+                {usedBoosters.includes("batsman") ? (
+                  <span className="booster-card__badge">Applied</span>
+                ) : boosterSelected === "batsman" ? (
+                  <span className="booster-card__badge">Selected</span>
+                ) : null}
+              </div>
+              <div
+                className={`booster-card ${boosterSelected === "bowler" ? "booster-card--active" : ""} ${usedBoosters.includes("bowler") ? "booster-card--used" : ""}`}
+                aria-disabled={boosterDisabled || usedBoosters.includes("bowler")}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleBoosterToggle("bowler")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleBoosterToggle("bowler");
+                  }
+                }}
+              >
+                <img
+                  src={bowlerBooster}
+                  alt="Bowler Booster"
+                  className="booster-card__image"
+                  title={teamMeta?.boosterUsed ? "Booster already used for this tournament." : "Apply Bowler Booster"}
+                />
+                <div className="booster-card__meta">
+                  <strong>Bowler Booster</strong>
+                  <span>2x points for all bowlers</span>
+                </div>
+                {usedBoosters.includes("bowler") ? (
+                  <span className="booster-card__badge">Applied</span>
+                ) : boosterSelected === "bowler" ? (
+                  <span className="booster-card__badge">Selected</span>
+                ) : null}
+              </div>
+              <div
+                className={`booster-card ${boosterSelected === "wk" ? "booster-card--active" : ""} ${usedBoosters.includes("wk") ? "booster-card--used" : ""}`}
+                aria-disabled={boosterDisabled || usedBoosters.includes("wk")}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleBoosterToggle("wk")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleBoosterToggle("wk");
+                  }
+                }}
+              >
+                <img
+                  src={wkBooster}
+                  alt="Wicket-Keeper Booster"
+                  className="booster-card__image"
+                  title={teamMeta?.boosterUsed ? "Booster already used for this tournament." : "Apply Wicket-Keeper Booster"}
+                />
+                <div className="booster-card__meta">
+                  <strong>Wicket-Keeper Booster</strong>
+                  <span>2x points for all wicket-keepers</span>
+                </div>
+                {usedBoosters.includes("wk") ? (
+                  <span className="booster-card__badge">Applied</span>
+                ) : boosterSelected === "wk" ? (
+                  <span className="booster-card__badge">Selected</span>
+                ) : null}
+              </div>
+              <div
+                className={`booster-card ${boosterSelected === "allrounder" ? "booster-card--active" : ""} ${usedBoosters.includes("allrounder") ? "booster-card--used" : ""}`}
+                aria-disabled={boosterDisabled || usedBoosters.includes("allrounder")}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleBoosterToggle("allrounder")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleBoosterToggle("allrounder");
+                  }
+                }}
+              >
+                <img
+                  src={allRounderBooster}
+                  alt="All-Rounder Booster"
+                  className="booster-card__image"
+                  title={teamMeta?.boosterUsed ? "Booster already used for this tournament." : "Apply All-Rounder Booster"}
+                />
+                <div className="booster-card__meta">
+                  <strong>All-Rounder Booster</strong>
+                  <span>2x points for all all-rounders</span>
+                </div>
+                {usedBoosters.includes("allrounder") ? (
+                  <span className="booster-card__badge">Applied</span>
+                ) : boosterSelected === "allrounder" ? (
+                  <span className="booster-card__badge">Selected</span>
+                ) : null}
+              </div>
+              <div
+                className={`booster-card ${boosterSelected === "teamx2" ? "booster-card--active" : ""} ${usedBoosters.includes("teamx2") ? "booster-card--used" : ""}`}
+                aria-disabled={boosterDisabled || usedBoosters.includes("teamx2")}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleBoosterToggle("teamx2")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleBoosterToggle("teamx2");
+                  }
+                }}
+              >
+                <img
+                  src={teamX2Booster}
+                  alt="Team X2 Booster"
+                  className="booster-card__image"
+                  title={teamMeta?.boosterUsed ? "Booster already used for this tournament." : "Apply Team X2 Booster"}
+                />
+                <div className="booster-card__meta">
+                  <strong>Team X2</strong>
+                  <span>2x points for all players</span>
+                </div>
+                {usedBoosters.includes("teamx2") ? (
+                  <span className="booster-card__badge">Applied</span>
+                ) : boosterSelected === "teamx2" ? (
+                  <span className="booster-card__badge">Selected</span>
+                ) : null}
+              </div>
+              <div
+                className={`booster-card ${boosterSelected === "captainx3" ? "booster-card--active" : ""} ${usedBoosters.includes("captainx3") ? "booster-card--used" : ""}`}
+                aria-disabled={boosterDisabled || usedBoosters.includes("captainx3")}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleBoosterToggle("captainx3")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleBoosterToggle("captainx3");
+                  }
+                }}
+              >
+                <img
+                  src={captainX3Booster}
+                  alt="Captain X3 Booster"
+                  className="booster-card__image"
+                  title={teamMeta?.boosterUsed ? "Booster already used for this tournament." : "Apply CAPTAIN X3 Booster"}
+                />
+                <div className="booster-card__meta">
+                  <strong>CAPTAIN X3</strong>
+                  <span>3x points for one player</span>
+                </div>
+                {usedBoosters.includes("captainx3") ? (
+                  <span className="booster-card__badge">Applied</span>
+                ) : boosterSelected === "captainx3" ? (
+                  <span className="booster-card__badge">Selected</span>
+                ) : null}
+              </div>
+            </div>
+            {boosterSelected === "captainx3" && (
+              <div className="booster-select">
+                <label className="label">Select player (cannot be Captain or Vice-Captain)</label>
+                <select
+                  className="input"
+                  value={boosterPlayerId}
+                  onChange={(e) => setBoosterPlayerId(e.target.value)}
+                >
+                  <option value="">Select player</option>
+                  {selectedPlayers
+                    .filter((p) => String(p._id) !== String(captainId) && String(p._id) !== String(viceCaptainId))
+                    .map((player) => (
+                      <option key={`bx3-${player._id}`} value={player._id}>
+                        {player.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+            <div className="booster-hint">Use once during the tournament. Apply when updating your team.</div>
+          </div>
           <div className="panel-block">
             <div className="panel-title">Selected XI</div>
             <SelectedTeamField

@@ -17,20 +17,34 @@ function normalizeName(value) {
     .trim();
 }
 
-function totalWithCaptaincy(points, captainName, viceName) {
+function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByName = new Map(), boosterPlayerNameKey = null) {
   let total = 0;
   const capKey = normalizeName(captainName);
   const vcKey = normalizeName(viceName);
   for (const p of points) {
     const nameKey = normalizeName(p.name);
     const base = Number(p.total || 0);
-    if (capKey && nameKey === capKey) {
-      total += base * 2;
-    } else if (vcKey && nameKey === vcKey) {
-      total += base * 1.5;
-    } else {
-      total += base;
+    let multiplier = 1;
+    if (boosterType === "batsman" || boosterType === "bowler" || boosterType === "wk" || boosterType === "allrounder" || boosterType === "teamx2" || boosterType === "captainx3") {
+      const role = roleByName.get(nameKey) || "";
+      const lower = String(role).toLowerCase();
+      const isBatsman = lower.includes("bat") && !lower.includes("all");
+      const isBowler = lower.includes("bowl");
+      const isWicketkeeper = lower.includes("wk") || lower.includes("keeper");
+      const isAllRounder = lower.includes("all");
+      if (boosterType === "batsman" && isBatsman) multiplier *= 2;
+      if (boosterType === "bowler" && isBowler) multiplier *= 2;
+      if (boosterType === "wk" && isWicketkeeper) multiplier *= 2;
+      if (boosterType === "allrounder" && isAllRounder) multiplier *= 2;
+      if (boosterType === "teamx2") multiplier *= 2;
+      if (boosterType === "captainx3" && boosterPlayerNameKey && nameKey === boosterPlayerNameKey) multiplier *= 3;
     }
+    if (capKey && nameKey === capKey) {
+      multiplier *= 2;
+    } else if (vcKey && nameKey === vcKey) {
+      multiplier *= 1.5;
+    }
+    total += base * multiplier;
   }
   return total;
 }
@@ -245,8 +259,9 @@ router.get("/daily", authRequired, async (req, res) => {
     for (const s of submissions) {
       const points = pointsMap.get(String(s.matchId)) || [];
       const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
+      const roleByName = new Map((s.players || []).map((p) => [normalizeName(p.name), p.role]));
       const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
-      total += totalWithCaptaincy(filtered, s.captain?.name, s.viceCaptain?.name);
+      total += totalWithCaptaincy(filtered, s.captain?.name, s.viceCaptain?.name, s.booster, roleByName);
       matches += 1;
     }
 
@@ -299,7 +314,7 @@ router.post("/points/since", authRequired, async (req, res) => {
     for (const doc of docs) {
       const points = Array.isArray(doc.points) ? doc.points : [];
       const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
-      total += totalWithCaptaincy(filtered, captainName, viceName);
+      total += totalWithCaptaincy(filtered, captainName, viceName, null, new Map(), null);
     }
 
     res.json({ since: startMs, totalPoints: total, matches: docs.length });
@@ -324,6 +339,9 @@ router.get("/submissions", authRequired, async (req, res) => {
     const rows = submissions.map((s) => {
       const points = pointsMap.get(String(s.matchId)) || [];
       const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
+      const roleByName = new Map((s.players || []).map((p) => [normalizeName(p.name), p.role]));
+      const boosterPlayerName = getPlayerNameById(s.players, s.boosterPlayer);
+      const boosterPlayerKey = normalizeName(boosterPlayerName);
       const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
       const capName = s.captain?.name || getPlayerNameById(s.players, s.captain);
       const vcName = s.viceCaptain?.name || getPlayerNameById(s.players, s.viceCaptain);
@@ -334,8 +352,22 @@ router.get("/submissions", authRequired, async (req, res) => {
           const key = normalizeName(p.name);
           const base = Number(p.total || 0);
           let multiplier = 1;
-          if (capKey && key === capKey) multiplier = 2;
-          else if (vcKey && key === vcKey) multiplier = 1.5;
+          if (s.booster === "batsman" || s.booster === "bowler" || s.booster === "wk" || s.booster === "allrounder" || s.booster === "teamx2" || s.booster === "captainx3") {
+            const role = roleByName.get(key) || "";
+            const lower = String(role).toLowerCase();
+            const isBatsman = lower.includes("bat") && !lower.includes("all");
+            const isBowler = lower.includes("bowl");
+            const isWicketkeeper = lower.includes("wk") || lower.includes("keeper");
+            const isAllRounder = lower.includes("all");
+            if (s.booster === "batsman" && isBatsman) multiplier *= 2;
+            if (s.booster === "bowler" && isBowler) multiplier *= 2;
+            if (s.booster === "wk" && isWicketkeeper) multiplier *= 2;
+            if (s.booster === "allrounder" && isAllRounder) multiplier *= 2;
+            if (s.booster === "teamx2") multiplier *= 2;
+            if (s.booster === "captainx3" && boosterPlayerKey && key === boosterPlayerKey) multiplier *= 3;
+          }
+          if (capKey && key === capKey) multiplier *= 2;
+          else if (vcKey && key === vcKey) multiplier *= 1.5;
           return {
             name: p.name,
             basePoints: base,
@@ -344,7 +376,7 @@ router.get("/submissions", authRequired, async (req, res) => {
           };
         })
         .sort((a, b) => b.totalPoints - a.totalPoints);
-      const total = totalWithCaptaincy(filtered, s.captain?.name, s.viceCaptain?.name);
+      const total = totalWithCaptaincy(filtered, s.captain?.name, s.viceCaptain?.name, s.booster, roleByName, boosterPlayerKey || null);
       return {
         id: s._id,
         matchId: s.matchId,
@@ -354,6 +386,8 @@ router.get("/submissions", authRequired, async (req, res) => {
         team1: s.team1 || null,
         team2: s.team2 || null,
         venue: s.venue || null,
+        booster: s.booster || null,
+        boosterPlayer: s.boosterPlayer || null,
         totalPoints: total,
         breakdown
       };
@@ -386,6 +420,9 @@ router.get("/submissions/:id", async (req, res) => {
     const pointsDoc = await FantasyMatchPoints.findOne({ matchId: submission.matchId }).lean();
     const points = Array.isArray(pointsDoc?.points) ? pointsDoc.points : [];
     const nameSet = new Set((submission.players || []).map((p) => normalizeName(p.name)));
+    const roleByName = new Map((submission.players || []).map((p) => [normalizeName(p.name), p.role]));
+    const boosterPlayerName = getPlayerNameById(submission.players, submission.boosterPlayer);
+    const boosterPlayerKey = normalizeName(boosterPlayerName);
     const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
     const capName = submission.captain?.name || getPlayerNameById(submission.players, submission.captain);
     const vcName = submission.viceCaptain?.name || getPlayerNameById(submission.players, submission.viceCaptain);
@@ -396,8 +433,22 @@ router.get("/submissions/:id", async (req, res) => {
         const key = normalizeName(p.name);
         const base = Number(p.total || 0);
         let multiplier = 1;
-        if (capKey && key === capKey) multiplier = 2;
-        else if (vcKey && key === vcKey) multiplier = 1.5;
+        if (submission.booster === "batsman" || submission.booster === "bowler" || submission.booster === "wk" || submission.booster === "allrounder" || submission.booster === "teamx2" || submission.booster === "captainx3") {
+          const role = roleByName.get(key) || "";
+          const lower = String(role).toLowerCase();
+          const isBatsman = lower.includes("bat") && !lower.includes("all");
+          const isBowler = lower.includes("bowl");
+          const isWicketkeeper = lower.includes("wk") || lower.includes("keeper");
+          const isAllRounder = lower.includes("all");
+          if (submission.booster === "batsman" && isBatsman) multiplier *= 2;
+          if (submission.booster === "bowler" && isBowler) multiplier *= 2;
+          if (submission.booster === "wk" && isWicketkeeper) multiplier *= 2;
+          if (submission.booster === "allrounder" && isAllRounder) multiplier *= 2;
+          if (submission.booster === "teamx2") multiplier *= 2;
+          if (submission.booster === "captainx3" && boosterPlayerKey && key === boosterPlayerKey) multiplier *= 3;
+        }
+        if (capKey && key === capKey) multiplier *= 2;
+        else if (vcKey && key === vcKey) multiplier *= 1.5;
         return {
           name: p.name,
           basePoints: base,
@@ -417,7 +468,9 @@ router.get("/submissions/:id", async (req, res) => {
         team1: submission.team1 || null,
         team2: submission.team2 || null,
         venue: submission.venue || null,
-        totalPoints: totalWithCaptaincy(filtered, capName, vcName),
+        booster: submission.booster || null,
+        boosterPlayer: submission.boosterPlayer || null,
+        totalPoints: totalWithCaptaincy(filtered, capName, vcName, submission.booster, roleByName, boosterPlayerKey || null),
         players: submission.players || [],
         captainId: submission.captain?._id || submission.captain || null,
         viceCaptainId: submission.viceCaptain?._id || submission.viceCaptain || null,

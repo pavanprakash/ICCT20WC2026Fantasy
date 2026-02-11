@@ -11,6 +11,8 @@ const TeamSubmissionSchema = new mongoose.Schema(
     team1: { type: String },
     team2: { type: String },
     venue: { type: String },
+    booster: { type: String, default: null },
+    boosterPlayer: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
     players: [{ type: mongoose.Schema.Types.ObjectId, ref: "Player", required: true }],
     captain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
     viceCaptain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null }

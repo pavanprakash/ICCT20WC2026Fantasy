@@ -11,7 +11,8 @@
     "sync:fantasy": "node src/scripts/syncFantasyPoints.js",
     "reset:password": "node src/scripts/resetPassword.js",
     "backfill:submissions": "node src/scripts/backfillSubmissions.js",
-    "backfill:first-submit": "node src/scripts/backfillFirstSubmittedMatchStart.js"
+    "backfill:first-submit": "node src/scripts/backfillFirstSubmittedMatchStart.js",
+    "backfill:boosters": "node src/scripts/backfillUsedBoosters.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

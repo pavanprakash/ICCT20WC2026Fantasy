@@ -1,0 +1,13 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b2a6e"/>
+      <stop offset="100%" stop-color="#09183a"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="240" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="224" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="6"/>
+  <text x="256" y="270" font-family="Arial Black, Arial, sans-serif" font-size="72" text-anchor="middle" fill="#ffffff" letter-spacing="2">
+    CAPT <tspan fill="#ff9f1c">X 3</tspan>
+  </text>
+</svg>
