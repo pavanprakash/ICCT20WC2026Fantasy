@@ -5,7 +5,7 @@ import Team from "../models/Team.js";
 import League from "../models/League.js";
 import User from "../models/User.js";
 import TeamSubmission from "../models/TeamSubmission.js";
-import { cricapiGet } from "../services/cricapi.js";
+import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
 import { calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
 
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
@@ -83,8 +83,18 @@ async function syncFantasyPoints() {
   for (const match of matches) {
     const matchId = match?.id || match?.match_id || match?.matchId || match?.unique_id;
     if (!matchId) continue;
-    const scoreData = await cricapiGet("/match_scorecard", { id: matchId }, SCORECARD_KEY);
-    const scoreRoot = scoreData?.data;
+    const safe = await cricapiGetScorecardSafe(matchId, SCORECARD_KEY);
+    if (safe.skipped) {
+      console.warn(
+        JSON.stringify({
+          source: "jobs/dailyLeagueUpdate:syncFantasyPoints",
+          matchId,
+          reason: safe.reason || "unavailable"
+        })
+      );
+      continue;
+    }
+    const scoreRoot = safe.data?.data;
     if (!isCompletedMatch(match) && !isCompletedScorecard(scoreRoot)) {
       continue;
     }
@@ -153,6 +163,7 @@ function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByNa
     const nameKey = normalizeName(p.name);
     const base = Number(p.total || 0);
     let multiplier = 1;
+    let skipCaptaincy = false;
     if (boosterType === "batsman" || boosterType === "bowler" || boosterType === "wk" || boosterType === "allrounder" || boosterType === "teamx2" || boosterType === "captainx3") {
       const role = roleByName.get(nameKey) || "";
       const lower = String(role).toLowerCase();
@@ -165,11 +176,14 @@ function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByNa
       if (boosterType === "wk" && isWicketkeeper) multiplier *= 2;
       if (boosterType === "allrounder" && isAllRounder) multiplier *= 2;
       if (boosterType === "teamx2") multiplier *= 2;
-      if (boosterType === "captainx3" && boosterPlayerNameKey && nameKey === boosterPlayerNameKey) multiplier *= 3;
+      if (boosterType === "captainx3" && boosterPlayerNameKey && nameKey === boosterPlayerNameKey) {
+        multiplier *= 3;
+        skipCaptaincy = true;
+      }
     }
-    if (capKey && nameKey === capKey) {
+    if (!skipCaptaincy && capKey && nameKey === capKey) {
       multiplier *= 2;
-    } else if (vcKey && nameKey === vcKey) {
+    } else if (!skipCaptaincy && vcKey && nameKey === vcKey) {
       multiplier *= 1.5;
     }
     total += base * multiplier;

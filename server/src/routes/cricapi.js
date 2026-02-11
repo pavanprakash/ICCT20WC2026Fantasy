@@ -1,5 +1,5 @@
 import express from "express";
-import { cricapiGet } from "../services/cricapi.js";
+import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
 
 const router = express.Router();
 
@@ -41,8 +41,22 @@ router.get("/match_info/:id", async (req, res) => {
 
 router.get("/match_scorecard/:id", async (req, res) => {
   try {
-    const data = await cricapiGet("/match_scorecard", { id: req.params.id, ...req.query });
-    res.json(data);
+    const safe = await cricapiGetScorecardSafe(req.params.id);
+    if (safe.skipped) {
+      console.warn(
+        JSON.stringify({
+          source: "routes/cricapi:GET /match_scorecard/:id",
+          matchId: req.params.id,
+          reason: safe.reason || "unavailable"
+        })
+      );
+      return res.json({
+        skipped: true,
+        reason: safe.reason || "unavailable",
+        matchId: req.params.id
+      });
+    }
+    res.json(safe.data);
   } catch (err) {
     res.status(502).json({ error: err.message });
   }

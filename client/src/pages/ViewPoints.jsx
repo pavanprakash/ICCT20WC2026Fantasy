@@ -63,11 +63,21 @@ export default function ViewPoints() {
           {rows.map((row) => {
             const fixture = row.matchName || (row.team1 && row.team2 ? `${row.team1} vs ${row.team2}` : "TBD");
             const when = row.matchStartMs || row.matchDate;
+            const showCaptainTags = Boolean(row.booster) && row.booster !== "captainx3";
             return (
               <div className="table__row" key={row.id}>
                 <span>{formatDate(when)}</span>
                 <span>{formatTime(when)}</span>
-                <span>{fixture}</span>
+                <span>
+                  {fixture}
+                  {showCaptainTags && (row.captainName || row.viceCaptainName) ? (
+                    <div className="muted">
+                      {row.captainName ? `${row.captainName} (C)` : null}
+                      {row.captainName && row.viceCaptainName ? " · " : null}
+                      {row.viceCaptainName ? `${row.viceCaptainName} (VC)` : null}
+                    </div>
+                  ) : null}
+                </span>
                 <span>{row.venue || "TBD"}</span>
                 <span>
                   <Link to={`/points/${row.id}`} className="link link--points">

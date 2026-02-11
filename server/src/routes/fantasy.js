@@ -25,6 +25,7 @@ function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByNa
     const nameKey = normalizeName(p.name);
     const base = Number(p.total || 0);
     let multiplier = 1;
+    let skipCaptaincy = false;
     if (boosterType === "batsman" || boosterType === "bowler" || boosterType === "wk" || boosterType === "allrounder" || boosterType === "teamx2" || boosterType === "captainx3") {
       const role = roleByName.get(nameKey) || "";
       const lower = String(role).toLowerCase();
@@ -37,11 +38,14 @@ function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByNa
       if (boosterType === "wk" && isWicketkeeper) multiplier *= 2;
       if (boosterType === "allrounder" && isAllRounder) multiplier *= 2;
       if (boosterType === "teamx2") multiplier *= 2;
-      if (boosterType === "captainx3" && boosterPlayerNameKey && nameKey === boosterPlayerNameKey) multiplier *= 3;
+      if (boosterType === "captainx3" && boosterPlayerNameKey && nameKey === boosterPlayerNameKey) {
+        multiplier *= 3;
+        skipCaptaincy = true;
+      }
     }
-    if (capKey && nameKey === capKey) {
+    if (!skipCaptaincy && capKey && nameKey === capKey) {
       multiplier *= 2;
-    } else if (vcKey && nameKey === vcKey) {
+    } else if (!skipCaptaincy && vcKey && nameKey === vcKey) {
       multiplier *= 1.5;
     }
     total += base * multiplier;
@@ -127,8 +131,28 @@ router.get("/score/:matchId", async (req, res) => {
     const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
 
     const { matchId } = req.params;
-    const apiData = await cricapiGet("/match_scorecard", { id: matchId });
-    const scorecard = apiData?.data?.scorecard || apiData?.data?.innings || apiData?.data;
+    const safe = await cricapiGetScorecardSafe(matchId);
+    if (safe.skipped) {
+      console.warn(
+        JSON.stringify({
+          source: "routes/fantasy:GET /score/:matchId",
+          matchId,
+          reason: safe.reason || "unavailable"
+        })
+      );
+      return res.json({
+        matchId,
+        ruleset: rules.name,
+        points: [],
+        warnings: [
+          "Scorecard not available yet for this match."
+        ],
+        skipped: true,
+        reason: safe.reason || "unavailable"
+      });
+    }
+    const scoreRoot = safe.data?.data;
+    const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
 
     const points = calculateMatchPoints(scorecard, rules);
 
@@ -180,12 +204,21 @@ router.post("/sync", async (req, res) => {
     for (const match of matches) {
       const matchId = match?.id || match?.match_id || match?.matchId || match?.unique_id;
       if (!matchId) continue;
-      const scoreData = await cricapiGet(
-        "/match_scorecard",
-        { id: matchId },
+      const safe = await cricapiGetScorecardSafe(
+        matchId,
         process.env.CRICAPI_SCORECARD_KEY || process.env.CRICAPI_KEY
       );
-      const scoreRoot = scoreData?.data;
+      if (safe.skipped) {
+        console.warn(
+          JSON.stringify({
+            source: "routes/fantasy:POST /sync",
+            matchId,
+            reason: safe.reason || "unavailable"
+          })
+        );
+        continue;
+      }
+      const scoreRoot = safe.data?.data;
       if (!isCompletedMatch(match) && !isCompletedScorecard(scoreRoot)) {
         continue;
       }
@@ -351,27 +384,31 @@ router.get("/submissions", authRequired, async (req, res) => {
         .map((p) => {
           const key = normalizeName(p.name);
           const base = Number(p.total || 0);
-          let multiplier = 1;
-          if (s.booster === "batsman" || s.booster === "bowler" || s.booster === "wk" || s.booster === "allrounder" || s.booster === "teamx2" || s.booster === "captainx3") {
-            const role = roleByName.get(key) || "";
-            const lower = String(role).toLowerCase();
-            const isBatsman = lower.includes("bat") && !lower.includes("all");
-            const isBowler = lower.includes("bowl");
-            const isWicketkeeper = lower.includes("wk") || lower.includes("keeper");
-            const isAllRounder = lower.includes("all");
-            if (s.booster === "batsman" && isBatsman) multiplier *= 2;
-            if (s.booster === "bowler" && isBowler) multiplier *= 2;
-            if (s.booster === "wk" && isWicketkeeper) multiplier *= 2;
-            if (s.booster === "allrounder" && isAllRounder) multiplier *= 2;
-            if (s.booster === "teamx2") multiplier *= 2;
-            if (s.booster === "captainx3" && boosterPlayerKey && key === boosterPlayerKey) multiplier *= 3;
+        let multiplier = 1;
+        let skipCaptaincy = false;
+        if (s.booster === "batsman" || s.booster === "bowler" || s.booster === "wk" || s.booster === "allrounder" || s.booster === "teamx2" || s.booster === "captainx3") {
+          const role = roleByName.get(key) || "";
+          const lower = String(role).toLowerCase();
+          const isBatsman = lower.includes("bat") && !lower.includes("all");
+          const isBowler = lower.includes("bowl");
+          const isWicketkeeper = lower.includes("wk") || lower.includes("keeper");
+          const isAllRounder = lower.includes("all");
+          if (s.booster === "batsman" && isBatsman) multiplier *= 2;
+          if (s.booster === "bowler" && isBowler) multiplier *= 2;
+          if (s.booster === "wk" && isWicketkeeper) multiplier *= 2;
+          if (s.booster === "allrounder" && isAllRounder) multiplier *= 2;
+          if (s.booster === "teamx2") multiplier *= 2;
+          if (s.booster === "captainx3" && boosterPlayerKey && key === boosterPlayerKey) {
+            multiplier *= 3;
+            skipCaptaincy = true;
           }
-          if (capKey && key === capKey) multiplier *= 2;
-          else if (vcKey && key === vcKey) multiplier *= 1.5;
-          return {
-            name: p.name,
-            basePoints: base,
-            multiplier,
+        }
+        if (!skipCaptaincy && capKey && key === capKey) multiplier *= 2;
+        else if (!skipCaptaincy && vcKey && key === vcKey) multiplier *= 1.5;
+        return {
+          name: p.name,
+          basePoints: base,
+          multiplier,
             totalPoints: base * multiplier
           };
         })
@@ -388,6 +425,8 @@ router.get("/submissions", authRequired, async (req, res) => {
         venue: s.venue || null,
         booster: s.booster || null,
         boosterPlayer: s.boosterPlayer || null,
+        captainName: capName || null,
+        viceCaptainName: vcName || null,
         totalPoints: total,
         breakdown
       };
@@ -433,6 +472,7 @@ router.get("/submissions/:id", async (req, res) => {
         const key = normalizeName(p.name);
         const base = Number(p.total || 0);
         let multiplier = 1;
+        let skipCaptaincy = false;
         if (submission.booster === "batsman" || submission.booster === "bowler" || submission.booster === "wk" || submission.booster === "allrounder" || submission.booster === "teamx2" || submission.booster === "captainx3") {
           const role = roleByName.get(key) || "";
           const lower = String(role).toLowerCase();
@@ -445,10 +485,13 @@ router.get("/submissions/:id", async (req, res) => {
           if (submission.booster === "wk" && isWicketkeeper) multiplier *= 2;
           if (submission.booster === "allrounder" && isAllRounder) multiplier *= 2;
           if (submission.booster === "teamx2") multiplier *= 2;
-          if (submission.booster === "captainx3" && boosterPlayerKey && key === boosterPlayerKey) multiplier *= 3;
+          if (submission.booster === "captainx3" && boosterPlayerKey && key === boosterPlayerKey) {
+            multiplier *= 3;
+            skipCaptaincy = true;
+          }
         }
-        if (capKey && key === capKey) multiplier *= 2;
-        else if (vcKey && key === vcKey) multiplier *= 1.5;
+        if (!skipCaptaincy && capKey && key === capKey) multiplier *= 2;
+        else if (!skipCaptaincy && vcKey && key === vcKey) multiplier *= 1.5;
         return {
           name: p.name,
           basePoints: base,

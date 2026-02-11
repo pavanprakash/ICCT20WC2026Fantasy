@@ -16,6 +16,18 @@ const formatDateTime = (value) => {
   return dt.toLocaleString();
 };
 
+const boosterLabel = (value) => {
+  const key = String(value || "").toLowerCase();
+  if (!key) return null;
+  if (key === "batsman") return "Batsman Booster";
+  if (key === "bowler") return "Bowler Booster";
+  if (key === "wk") return "Wicketkeeper Booster";
+  if (key === "allrounder") return "All-rounder Booster";
+  if (key === "teamx2") return "Team X2 Booster";
+  if (key === "captainx3") return "Captain X3 Booster";
+  return "Booster";
+};
+
 export default function ViewSubmission() {
   const { id } = useParams();
   const [submission, setSubmission] = useState(null);
@@ -38,14 +50,32 @@ export default function ViewSubmission() {
     };
   }, [id]);
 
+  const captainKey = useMemo(() => {
+    if (!submission?.captainId || !submission?.players?.length) return null;
+    const cap = submission.players.find((p) => String(p._id) === String(submission.captainId));
+    return cap ? normalize(cap.name) : null;
+  }, [submission?.captainId, submission?.players]);
+
+  const viceCaptainKey = useMemo(() => {
+    if (!submission?.viceCaptainId || !submission?.players?.length) return null;
+    const vc = submission.players.find((p) => String(p._id) === String(submission.viceCaptainId));
+    return vc ? normalize(vc.name) : null;
+  }, [submission?.viceCaptainId, submission?.players]);
+
+  const breakdown = useMemo(() => {
+    const rows = Array.isArray(submission?.breakdown) ? submission.breakdown : [];
+    return rows.slice();
+  }, [submission?.breakdown]);
+
   const pointsByName = useMemo(() => {
     const map = new Map();
-    if (!submission?.breakdown) return map;
-    submission.breakdown.forEach((p) => {
+    breakdown.forEach((p) => {
       map.set(normalize(p.name), p.totalPoints);
     });
     return map;
-  }, [submission?.breakdown]);
+  }, [breakdown]);
+
+  const showCaptainTags = Boolean(submission?.booster) && submission?.booster !== "captainx3";
 
   return (
     <section className="page">
@@ -62,7 +92,9 @@ export default function ViewSubmission() {
         )}
       </div>
       {submission?.booster ? (
-        <div className="notice notice--success">Batsmen Booster applied for this fixture.</div>
+        <div className="notice notice--success">
+          {boosterLabel(submission.booster)} applied for this fixture.
+        </div>
       ) : null}
 
       <div className="muted">
@@ -75,9 +107,9 @@ export default function ViewSubmission() {
         <>
           <div className="panel-block">
               <div className="panel-title">Total Points</div>
-              <div className="muted">{submission.totalPoints}</div>
+              <div className="points-accent">{submission.totalPoints}</div>
             </div>
-          {submission.breakdown && submission.breakdown.length ? (
+          {breakdown.length ? (
             <div className="panel-block">
               <div className="panel-title">Points Breakdown</div>
               <div className="table table--points">
@@ -87,9 +119,13 @@ export default function ViewSubmission() {
                   <span>Multiplier</span>
                   <span>Total</span>
                 </div>
-                {submission.breakdown.map((row) => (
+                {breakdown.map((row) => (
                   <div className="table__row" key={row.name}>
-                    <span>{row.name}</span>
+                    <span>
+                      {row.name}
+                      {showCaptainTags && captainKey && normalize(row.name) === captainKey ? " (C)" : ""}
+                      {showCaptainTags && viceCaptainKey && normalize(row.name) === viceCaptainKey ? " (VC)" : ""}
+                    </span>
                     <span>{row.basePoints}</span>
                     <span>{row.multiplier}x</span>
                     <span>{row.totalPoints}</span>

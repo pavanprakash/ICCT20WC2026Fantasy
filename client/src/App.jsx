@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Routes, Route, Navigate, Link, useLocation, useNavigate } from "react-router-dom";
 import api, { setAuthToken } from "./api.js";
 import Home from "./pages/Home.jsx";
@@ -15,6 +15,8 @@ import ViewSubmission from "./pages/ViewSubmission.jsx";
 import Profile from "./pages/Profile.jsx";
 import LeagueMemberPoints from "./pages/LeagueMemberPoints.jsx";
 import Contact from "./pages/Contact.jsx";
+import Downtime from "./pages/Downtime.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import t20Logo from "./assets/t20-logo.png";
 
 function Navbar({ user, onLogout }) {
@@ -127,6 +129,20 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState(null);
+  const [serverDown, setServerDown] = useState(false);
+  const [checkingHealth, setCheckingHealth] = useState(true);
+
+  const checkHealth = useCallback(async () => {
+    setCheckingHealth(true);
+    try {
+      await api.get("/health", { timeout: 5000 });
+      setServerDown(false);
+    } catch (err) {
+      setServerDown(true);
+    } finally {
+      setCheckingHealth(false);
+    }
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem("fantasy_auth");
@@ -140,6 +156,10 @@ export default function App() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    checkHealth();
+  }, [checkHealth]);
 
   useEffect(() => {
     if (user && location.pathname) {
@@ -163,56 +183,84 @@ export default function App() {
 
   const context = useMemo(() => ({ user }), [user]);
 
+  if (serverDown) {
+    return (
+      <Downtime
+        title="The server is taking a breather"
+        message="We cannot reach the scoreboard service right now."
+        detail="We will be back shortly. You can retry to see if the service is available again."
+        onRetry={checkHealth}
+      />
+    );
+  }
+
   return (
-    <div className="app">
-      <Navbar user={user} onLogout={handleLogout} />
-      <main>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/players" element={<Players />} />
-          <Route path="/fixtures" element={<Fixtures />} />
-          <Route path="/rules" element={<Rules />} />
-          <Route path="/leaderboard" element={<Leaderboard />} />
-          <Route
-            path="/points"
-            element={user ? <ViewPoints /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/points/:id"
-            element={user ? <ViewSubmission /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/team"
-            element={user ? <TeamBuilder context={context} /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/profile"
-            element={user ? <Profile /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/league"
-            element={user ? <LeagueCreate /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/league/:id"
-            element={user ? <LeagueDashboard /> : <Navigate to="/auth" />}
-          />
-          <Route
-            path="/league/:id/points/:userId"
-            element={user ? <LeagueMemberPoints /> : <Navigate to="/auth" />}
-          />
-          <Route path="/contact" element={<Contact />} />
-          <Route
-            path="/auth"
-            element={user ? <Navigate to="/leaderboard" /> : <Auth onAuth={handleAuth} />}
-          />
-        </Routes>
-      </main>
-      <footer className="footer">
-        <div>
-          Built for ICC World Cup 2026 Fantasy.
+    <ErrorBoundary
+      FallbackComponent={({ onReset }) => (
+        <Downtime
+          title="The app had a hiccup"
+          message="We hit a client-side issue while rendering this page."
+          detail="Refresh or try again in a moment."
+          onRetry={onReset}
+        />
+      )}
+      onReset={() => window.location.reload()}
+    >
+      <div className="app">
+        <Navbar user={user} onLogout={handleLogout} />
+        <main>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/players" element={<Players />} />
+            <Route path="/fixtures" element={<Fixtures />} />
+            <Route path="/rules" element={<Rules />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route
+              path="/points"
+              element={user ? <ViewPoints /> : <Navigate to="/auth" />}
+            />
+            <Route
+              path="/points/:id"
+              element={user ? <ViewSubmission /> : <Navigate to="/auth" />}
+            />
+            <Route
+              path="/team"
+              element={user ? <TeamBuilder context={context} /> : <Navigate to="/auth" />}
+            />
+            <Route
+              path="/profile"
+              element={user ? <Profile /> : <Navigate to="/auth" />}
+            />
+            <Route
+              path="/league"
+              element={user ? <LeagueCreate /> : <Navigate to="/auth" />}
+            />
+            <Route
+              path="/league/:id"
+              element={user ? <LeagueDashboard /> : <Navigate to="/auth" />}
+            />
+            <Route
+              path="/league/:id/points/:userId"
+              element={user ? <LeagueMemberPoints /> : <Navigate to="/auth" />}
+            />
+            <Route path="/contact" element={<Contact />} />
+            <Route
+              path="/auth"
+              element={user ? <Navigate to="/leaderboard" /> : <Auth onAuth={handleAuth} />}
+            />
+          </Routes>
+        </main>
+        <footer className="footer">
+          <div>
+            Built for ICC World Cup 2026 Fantasy.
+          </div>
+        </footer>
+      </div>
+      {checkingHealth ? (
+        <div className="healthcheck" aria-live="polite">
+          Checking server status…
         </div>
-      </footer>
-    </div>
+      ) : null}
+    </ErrorBoundary>
   );
 }

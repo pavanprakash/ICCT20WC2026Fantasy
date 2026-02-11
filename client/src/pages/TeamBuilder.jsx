@@ -122,6 +122,7 @@ export default function TeamBuilder() {
           setSelected(t.data.players.map((pl) => pl._id));
           setCaptainId(t.data.captain ? String(t.data.captain) : "");
           setViceCaptainId(t.data.viceCaptain ? String(t.data.viceCaptain) : "");
+          setBoosterPlayerId(t.data.boosterPlayer ? String(t.data.boosterPlayer) : "");
           setSavedTeam({
             players: t.data.players.map((pl) => pl._id),
             captainId: t.data.captain ? String(t.data.captain) : "",
@@ -143,10 +144,10 @@ export default function TeamBuilder() {
           submittedForMatchStart: t.data.submittedForMatchStart || null,
           boosterUsed: t.data.boosterUsed || false,
           boosterType: t.data.boosterType || null,
-          usedBoosters
+          usedBoosters,
+          boosterPlayer: t.data.boosterPlayer || null
         });
         setBoosterSelected(null);
-        setBoosterPlayerId(t.data.boosterPlayer ? String(t.data.boosterPlayer) : "");
         } else {
           setTeamMeta(null);
           setSavedTeam({ players: [], captainId: "", viceCaptainId: "" });
@@ -794,7 +795,7 @@ export default function TeamBuilder() {
         setViceCaptainId("");
       }
     }
-  }, [selected, captainId, viceCaptainId]);
+  }, [selected, captainId, viceCaptainId, boosterSelected, boosterPlayerId]);
 
   useEffect(() => {
     if (!teamMeta || !isEditing) return;
@@ -821,7 +822,7 @@ export default function TeamBuilder() {
   useEffect(() => {
     if (isEditing) return;
     setBoosterSelected(null);
-    setBoosterPlayerId(teamMeta?.boosterPlayer ? String(teamMeta?.boosterPlayer) : "");
+    setBoosterPlayerId(teamMeta?.boosterPlayer ? String(teamMeta.boosterPlayer) : "");
   }, [isEditing, teamMeta?.boosterPlayer]);
 
   const handleRemove = (id) => {

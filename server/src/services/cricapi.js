@@ -23,3 +23,50 @@ export async function cricapiGet(path, params, overrideKey) {
   }
   return res.json();
 }
+
+function extractMatchStatus(matchInfo) {
+  return (
+    matchInfo?.data?.status ||
+    matchInfo?.data?.matchStatus ||
+    matchInfo?.status ||
+    ""
+  );
+}
+
+function isNotStartedStatus(status) {
+  const value = String(status || "").toLowerCase();
+  return (
+    value.includes("not started") ||
+    value.includes("upcoming") ||
+    value.includes("fixture") ||
+    value.includes("scheduled")
+  );
+}
+
+function isScorecardNotFoundError(err) {
+  const msg = String(err?.message || "").toLowerCase();
+  return msg.includes("scorecard") && msg.includes("not found");
+}
+
+export async function cricapiGetScorecardSafe(matchId, overrideKey) {
+  let matchInfo = null;
+  try {
+    matchInfo = await cricapiGet("/match_info", { id: matchId }, overrideKey);
+    const status = extractMatchStatus(matchInfo);
+    if (isNotStartedStatus(status)) {
+      return { skipped: true, reason: "not_started", matchInfo };
+    }
+  } catch (err) {
+    // If match_info fails, fall back to scorecard attempt.
+  }
+
+  try {
+    const data = await cricapiGet("/match_scorecard", { id: matchId }, overrideKey);
+    return { skipped: false, data, matchInfo };
+  } catch (err) {
+    if (isScorecardNotFoundError(err)) {
+      return { skipped: true, reason: "not_found", error: err, matchInfo };
+    }
+    throw err;
+  }
+}

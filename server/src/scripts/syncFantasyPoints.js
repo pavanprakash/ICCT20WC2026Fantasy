@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import FantasyRule from "../models/FantasyRule.js";
 import FantasyMatchPoints from "../models/FantasyMatchPoints.js";
 import Player from "../models/Player.js";
-import { cricapiGet } from "../services/cricapi.js";
+import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
 import { calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
 
 dotenv.config();
@@ -129,8 +129,28 @@ async function run() {
   for (const match of matches) {
     const matchId = match?.id || match?.match_id || match?.matchId || match?.unique_id;
     if (!matchId) continue;
-    const scoreData = await cricapiGet("/match_scorecard", { id: matchId }, SCORECARD_KEY);
-    const scoreRoot = scoreData?.data;
+    const safe = await cricapiGetScorecardSafe(matchId, SCORECARD_KEY);
+    if (safe.skipped) {
+      console.warn(
+        JSON.stringify({
+          source: "scripts/syncFantasyPoints",
+          matchId,
+          reason: safe.reason || "unavailable"
+        })
+      );
+      if (debug) {
+        console.log(
+          JSON.stringify({
+            debug: true,
+            matchId,
+            message: "Scorecard not available",
+            reason: safe.reason || "unavailable"
+          })
+        );
+      }
+      continue;
+    }
+    const scoreRoot = safe.data?.data;
     if (match?.matchEnded !== true && !isCompletedMatch(match) && !isCompletedScorecard(scoreRoot)) {
       continue;
     }
