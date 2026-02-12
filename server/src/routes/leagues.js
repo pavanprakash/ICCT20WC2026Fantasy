@@ -8,6 +8,7 @@ import { cricapiGet } from "../services/cricapi.js";
 import fixtures from "../data/fixtures-2026.js";
 import { buildLeagueDashboard } from "../jobs/dailyLeagueUpdate.js";
 import { authRequired } from "../middleware/auth.js";
+import { normalizePlayingXI } from "../services/playingXI.js";
 
 const router = express.Router();
 
@@ -56,6 +57,57 @@ function getPlayerNameById(players, idOrObj) {
   const id = idOrObj?._id || idOrObj;
   const found = players.find((p) => String(p._id) === String(id));
   return found?.name || null;
+}
+
+function applySuperSub(submission, pointsDoc) {
+  const players = submission?.players || [];
+  const nameSet = new Set(players.map((p) => normalizeName(p.name)));
+  const roleByName = new Map(players.map((p) => [normalizeName(p.name), p.role]));
+  const capName = submission?.captain?.name || getPlayerNameById(players, submission?.captain);
+  const vcName = submission?.viceCaptain?.name || getPlayerNameById(players, submission?.viceCaptain);
+  let effectiveCapName = capName || null;
+  let effectiveVcName = vcName || null;
+
+  const playingXI = normalizePlayingXI(pointsDoc?.playingXI || []);
+  const superSub = submission?.superSub || null;
+  if (!superSub || !playingXI.length) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
+  }
+  const superKey = normalizeName(superSub.name);
+  if (!superKey || !playingXI.includes(superKey)) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
+  }
+
+  const missing = players.filter((p) => !playingXI.includes(normalizeName(p.name)));
+  if (!missing.length) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
+  }
+
+  const capKey = normalizeName(effectiveCapName);
+  const vcKey = normalizeName(effectiveVcName);
+  let target = missing.find((p) => normalizeName(p.name) === capKey);
+  if (!target && vcKey) {
+    target = missing.find((p) => normalizeName(p.name) === vcKey);
+  }
+  if (!target) {
+    target = missing[0];
+  }
+  if (!target) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
+  }
+
+  const targetKey = normalizeName(target.name);
+  nameSet.delete(targetKey);
+  nameSet.add(superKey);
+  roleByName.set(superKey, superSub.role || roleByName.get(superKey) || "");
+
+  if (capKey && targetKey === capKey) {
+    effectiveCapName = superSub.name;
+  } else if (vcKey && targetKey === vcKey) {
+    effectiveVcName = superSub.name;
+  }
+
+  return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: true, superSubName: superSub.name };
 }
 
 function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByName = new Map(), boosterPlayerNameKey = null) {
@@ -252,6 +304,7 @@ router.get("/:id/points/:userId", authRequired, async (req, res) => {
     .populate("players")
     .populate("captain")
     .populate("viceCaptain")
+    .populate("superSub")
     .sort({ matchStartMs: -1, createdAt: -1 })
     .lean();
 
@@ -260,7 +313,7 @@ router.get("/:id/points/:userId", authRequired, async (req, res) => {
 
   const matchIds = submissions.map((s) => s.matchId);
   const pointsDocs = await FantasyMatchPoints.find({ matchId: { $in: matchIds } }).lean();
-  const pointsMap = new Map(pointsDocs.map((d) => [String(d.matchId), d.points || []]));
+  const pointsMap = new Map(pointsDocs.map((d) => [String(d.matchId), d]));
 
   const rows = submissions.map((s) => {
     const matchMeta = matchMap.get(String(s.matchId)) || {};
@@ -272,14 +325,14 @@ router.get("/:id/points/:userId", authRequired, async (req, res) => {
       s.matchName ||
       matchMeta.name ||
       (team1 && team2 ? `${team1} vs ${team2}` : null);
-    const points = pointsMap.get(String(s.matchId)) || [];
-    const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
-    const roleByName = new Map((s.players || []).map((p) => [normalizeName(p.name), p.role]));
+    const pointsDoc = pointsMap.get(String(s.matchId)) || {};
+    const points = Array.isArray(pointsDoc.points) ? pointsDoc.points : [];
+    const applied = applySuperSub(s, pointsDoc);
     const boosterPlayerName = getPlayerNameById(s.players, s.boosterPlayer);
     const boosterPlayerKey = normalizeName(boosterPlayerName);
-    const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
-    const capName = s.captain?.name || getPlayerNameById(s.players, s.captain);
-    const vcName = s.viceCaptain?.name || getPlayerNameById(s.players, s.viceCaptain);
+    const filtered = points.filter((p) => applied.nameSet.has(normalizeName(p.name)));
+    const capName = applied.capName;
+    const vcName = applied.vcName;
     const capKey = normalizeName(capName);
     const vcKey = normalizeName(vcName);
     const breakdown = filtered
@@ -288,7 +341,7 @@ router.get("/:id/points/:userId", authRequired, async (req, res) => {
         const base = Number(p.total || 0);
         let multiplier = 1;
         if (s.booster === "batsman" || s.booster === "bowler" || s.booster === "wk" || s.booster === "allrounder" || s.booster === "teamx2" || s.booster === "captainx3") {
-          const role = roleByName.get(key) || "";
+          const role = applied.roleByName.get(key) || "";
           const lower = String(role).toLowerCase();
           const isBatsman = lower.includes("bat") && !lower.includes("all");
           const isBowler = lower.includes("bowl");
@@ -311,7 +364,7 @@ router.get("/:id/points/:userId", authRequired, async (req, res) => {
         };
       })
       .sort((a, b) => b.totalPoints - a.totalPoints);
-    const total = totalWithCaptaincy(filtered, capName, vcName, s.booster, roleByName, boosterPlayerKey || null);
+    const total = totalWithCaptaincy(filtered, capName, vcName, s.booster, applied.roleByName, boosterPlayerKey || null);
     return {
       id: s._id,
       matchId: s.matchId,
@@ -323,6 +376,8 @@ router.get("/:id/points/:userId", authRequired, async (req, res) => {
       venue,
       booster: s.booster || null,
       boosterPlayer: s.boosterPlayer || null,
+      superSub: s.superSub || null,
+      superSubUsed: Boolean(applied.superSubUsed),
       totalPoints: total,
       breakdown
     };

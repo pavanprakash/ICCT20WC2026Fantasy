@@ -17,6 +17,7 @@ const TeamSchema = new mongoose.Schema(
     boosterType: { type: String, default: null },
     usedBoosters: { type: [String], default: [] },
     boosterPlayer: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
+    superSub: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
     lastSubmissionDate: { type: String },
     submittedForDate: { type: String },
     submittedForMatchId: { type: String },

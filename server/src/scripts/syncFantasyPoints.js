@@ -5,6 +5,7 @@ import FantasyMatchPoints from "../models/FantasyMatchPoints.js";
 import Player from "../models/Player.js";
 import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
 import { calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
+import { getPlayingXI } from "../services/playingXI.js";
 
 dotenv.config();
 
@@ -155,6 +156,7 @@ async function run() {
       continue;
     }
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
+    const playingXI = getPlayingXI(scoreRoot);
     const points = calculateMatchPoints(scorecard, rules);
     if (!points.length) {
       if (debug) {
@@ -190,7 +192,7 @@ async function run() {
     const matchStartMs = matchStartMsFromMatch(match);
     await FantasyMatchPoints.findOneAndUpdate(
       { matchId: matchId, ruleset: rules.name },
-      { matchId: matchId, matchDate, matchStartMs, ruleset: rules.name, points },
+      { matchId: matchId, matchDate, matchStartMs, ruleset: rules.name, points, playingXI },
       { upsert: true, new: true }
     );
 

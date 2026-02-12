@@ -51,16 +51,22 @@ export default function ViewSubmission() {
   }, [id]);
 
   const captainKey = useMemo(() => {
+    if (submission?.effectiveCaptainName) {
+      return normalize(submission.effectiveCaptainName);
+    }
     if (!submission?.captainId || !submission?.players?.length) return null;
     const cap = submission.players.find((p) => String(p._id) === String(submission.captainId));
     return cap ? normalize(cap.name) : null;
-  }, [submission?.captainId, submission?.players]);
+  }, [submission?.captainId, submission?.players, submission?.effectiveCaptainName]);
 
   const viceCaptainKey = useMemo(() => {
+    if (submission?.effectiveViceCaptainName) {
+      return normalize(submission.effectiveViceCaptainName);
+    }
     if (!submission?.viceCaptainId || !submission?.players?.length) return null;
     const vc = submission.players.find((p) => String(p._id) === String(submission.viceCaptainId));
     return vc ? normalize(vc.name) : null;
-  }, [submission?.viceCaptainId, submission?.players]);
+  }, [submission?.viceCaptainId, submission?.players, submission?.effectiveViceCaptainName]);
 
   const breakdown = useMemo(() => {
     const rows = Array.isArray(submission?.breakdown) ? submission.breakdown : [];
@@ -94,6 +100,11 @@ export default function ViewSubmission() {
       {submission?.booster ? (
         <div className="notice notice--success">
           {boosterLabel(submission.booster)} applied for this fixture.
+        </div>
+      ) : null}
+      {submission?.superSub ? (
+        <div className="notice notice--info">
+          Super Sub: {submission.superSub.name || "Selected"}.
         </div>
       ) : null}
 

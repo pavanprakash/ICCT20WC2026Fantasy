@@ -622,6 +622,13 @@ main {
   font-size: 1.05rem;
 }
 
+.super-sub-used {
+  color: var(--accent);
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
 
 .pill {
   background: rgba(74, 215, 255, 0.2);
@@ -908,6 +915,12 @@ main {
   border: 1px solid rgba(255, 140, 0, 0.35);
 }
 
+.booster-flag--sub {
+  background: rgba(74, 215, 255, 0.2);
+  color: #0b3a54;
+  border-color: rgba(74, 215, 255, 0.45);
+}
+
 .fixture-mini {
   display: grid;
   gap: 10px;
@@ -959,6 +972,12 @@ main {
   background: rgba(34, 197, 94, 0.12);
   border: 1px solid rgba(34, 197, 94, 0.3);
   color: #166534;
+}
+
+.notice--info {
+  background: rgba(59, 91, 214, 0.12);
+  border: 1px solid rgba(59, 91, 214, 0.3);
+  color: #2542a8;
 }
 
 .label {

@@ -95,6 +95,8 @@ export default function TeamBuilder() {
   const [playersStatus, setPlayersStatus] = useState("loading");
   const [boosterSelected, setBoosterSelected] = useState(null);
   const [boosterPlayerId, setBoosterPlayerId] = useState("");
+  const [superSubId, setSuperSubId] = useState("");
+  const [submissionHistory, setSubmissionHistory] = useState([]);
 
   const refreshPlayers = async (shouldApply = () => true) => {
     const res = await api.get("/players");
@@ -112,17 +114,19 @@ export default function TeamBuilder() {
       }
       try {
         setPlayersStatus("loading");
-        const [p, t] = await Promise.all([api.get("/players"), api.get("/teams/me")]);
+        const [p, t, s] = await Promise.all([api.get("/players"), api.get("/teams/me"), api.get("/fantasy/submissions")]);
         if (!mounted) return;
         const list = Array.isArray(p.data) ? p.data : [];
         setPlayers(list);
         setPlayersStatus(list.length ? "ready" : "empty");
+        setSubmissionHistory(s.data?.submissions || []);
         if (t.data) {
           setTeamName(t.data.name);
           setSelected(t.data.players.map((pl) => pl._id));
           setCaptainId(t.data.captain ? String(t.data.captain) : "");
           setViceCaptainId(t.data.viceCaptain ? String(t.data.viceCaptain) : "");
           setBoosterPlayerId(t.data.boosterPlayer ? String(t.data.boosterPlayer) : "");
+          setSuperSubId(t.data.superSub ? String(t.data.superSub) : "");
           setSavedTeam({
             players: t.data.players.map((pl) => pl._id),
             captainId: t.data.captain ? String(t.data.captain) : "",
@@ -145,7 +149,8 @@ export default function TeamBuilder() {
           boosterUsed: t.data.boosterUsed || false,
           boosterType: t.data.boosterType || null,
           usedBoosters,
-          boosterPlayer: t.data.boosterPlayer || null
+          boosterPlayer: t.data.boosterPlayer || null,
+          superSub: t.data.superSub || null
         });
         setBoosterSelected(null);
         } else {
@@ -605,6 +610,7 @@ export default function TeamBuilder() {
         viceCaptainId,
         booster: boosterPayload,
         boosterPlayerId: boosterPlayerPayload || null,
+        superSubId: superSubId || null,
         nextMatch: nextMatch
           ? {
               id: nextMatch.id,
@@ -631,8 +637,28 @@ export default function TeamBuilder() {
           boosterUsed: res.data.boosterUsed ?? prev?.boosterUsed ?? false,
           boosterType: res.data.boosterType ?? prev?.boosterType ?? null,
           usedBoosters: res.data.usedBoosters ?? prev?.usedBoosters ?? [],
-          boosterPlayer: res.data.boosterPlayer ?? prev?.boosterPlayer ?? null
+          boosterPlayer: res.data.boosterPlayer ?? prev?.boosterPlayer ?? null,
+          superSub: res.data.superSub ?? prev?.superSub ?? null
         }));
+        if (superSubId && nextMatch?.date) {
+          setSubmissionHistory((prev) => {
+            const exists = prev.some((s) => s.matchId === nextMatch.id);
+            if (exists) return prev;
+            return [
+              {
+                id: `local-${nextMatch.id}`,
+                matchId: nextMatch.id,
+                matchDate: nextMatch.date,
+                matchStartMs: nextMatch.startMs,
+                matchName: nextMatch.name || null,
+                team1: nextMatch.team1 || null,
+                team2: nextMatch.team2 || null,
+                superSub: { _id: superSubId }
+              },
+              ...prev
+            ];
+          });
+        }
         setSavedTeam({
           players: [...selected],
           captainId,
@@ -648,6 +674,21 @@ export default function TeamBuilder() {
 
   const usedBoosters = teamMeta?.usedBoosters || [];
   const boosterDisabled = !isEditing;
+  const superSubOptions = useMemo(() => {
+    const selectedSet = new Set(selected.map(String));
+    return players.filter((p) => !selectedSet.has(String(p._id)));
+  }, [players, selected]);
+  const superSubUsage = useMemo(() => {
+    if (!nextMatch?.date || !submissionHistory.length) return null;
+    const used = submissionHistory.find((s) => {
+      const matchDate = s.matchDate || (s.matchStartMs ? new Date(s.matchStartMs).toISOString().slice(0, 10) : null);
+      return matchDate === nextMatch.date && s.superSub;
+    });
+    if (!used) return null;
+    const fixtureName = used.matchName || (used.team1 && used.team2 ? `${used.team1} vs ${used.team2}` : "this fixture");
+    return { used: true, fixtureName };
+  }, [submissionHistory, nextMatch?.date]);
+  const superSubDisabled = boosterDisabled || Boolean(superSubUsage?.used);
   const boosterLabel = (type) => {
     switch (type) {
       case "batsman":
@@ -795,7 +836,10 @@ export default function TeamBuilder() {
         setViceCaptainId("");
       }
     }
-  }, [selected, captainId, viceCaptainId, boosterSelected, boosterPlayerId]);
+    if (superSubId && selectedSet.has(String(superSubId))) {
+      setSuperSubId("");
+    }
+  }, [selected, captainId, viceCaptainId, boosterSelected, boosterPlayerId, superSubId]);
 
   useEffect(() => {
     if (!teamMeta || !isEditing) return;
@@ -823,7 +867,8 @@ export default function TeamBuilder() {
     if (isEditing) return;
     setBoosterSelected(null);
     setBoosterPlayerId(teamMeta?.boosterPlayer ? String(teamMeta.boosterPlayer) : "");
-  }, [isEditing, teamMeta?.boosterPlayer]);
+    setSuperSubId(teamMeta?.superSub ? String(teamMeta.superSub) : "");
+  }, [isEditing, teamMeta?.boosterPlayer, teamMeta?.superSub]);
 
   const handleRemove = (id) => {
     if (teamMeta && !isEditing) {
@@ -992,6 +1037,23 @@ export default function TeamBuilder() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="filter-group">
+              <label className="label">Super Sub (Optional)</label>
+              <select
+                className="input"
+                value={superSubId}
+                onChange={(e) => setSuperSubId(e.target.value)}
+                disabled={superSubDisabled}
+              >
+                <option value="">No super sub</option>
+                {superSubOptions.map((player) => (
+                  <option key={`ss-${player._id}`} value={player._id}>
+                    {player.name}
+                  </option>
+                ))}
+              </select>
+              <div className="muted">Replaces the first non-playing XI member for this fixture.</div>
             </div>
           </div>
           <div className="panel-block">
@@ -1261,6 +1323,11 @@ export default function TeamBuilder() {
           </div>
           <div className="panel-block">
             <div className="panel-title">Selected XI</div>
+            {superSubUsage?.used ? (
+              <div className="super-sub-used">
+                You have already used Super Sub against {superSubUsage.fixtureName}.
+              </div>
+            ) : null}
             <SelectedTeamField
               players={selectedPlayers}
               captainId={captainId}

@@ -7,6 +7,7 @@ import User from "../models/User.js";
 import TeamSubmission from "../models/TeamSubmission.js";
 import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
 import { calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
+import { getPlayingXI } from "../services/playingXI.js";
 
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
 const SERIES_KEY = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
@@ -99,6 +100,7 @@ async function syncFantasyPoints() {
       continue;
     }
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
+    const playingXI = getPlayingXI(scoreRoot);
     const points = calculateMatchPoints(scorecard, rules);
     if (!points.length) {
       continue;
@@ -108,7 +110,7 @@ async function syncFantasyPoints() {
     const matchDate = matchDateFromMatch(match);
     await FantasyMatchPoints.findOneAndUpdate(
       { matchId: matchId, ruleset: rules.name },
-      { matchId: matchId, matchDate, ruleset: rules.name, points },
+      { matchId: matchId, matchDate, ruleset: rules.name, points, playingXI },
       { upsert: true, new: true }
     );
 

@@ -84,6 +84,7 @@ export default function ViewPoints() {
                     {row.totalPoints}
                   </Link>
                   {row.booster ? <span className="booster-flag">Booster</span> : null}
+                  {row.superSubUsed ? <span className="booster-flag booster-flag--sub">Super Sub</span> : null}
                 </span>
               </div>
             );

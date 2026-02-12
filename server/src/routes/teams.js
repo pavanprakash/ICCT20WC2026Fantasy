@@ -7,6 +7,7 @@ import TeamSubmission from "../models/TeamSubmission.js";
 import fixtures from "../data/fixtures-2026.js";
 import { cricapiGet } from "../services/cricapi.js";
 import { authRequired } from "../middleware/auth.js";
+import { normalizePlayingXI } from "../services/playingXI.js";
 
 const router = express.Router();
 
@@ -33,6 +34,57 @@ function getPlayerNameById(players, idOrObj) {
   const id = idOrObj?._id || idOrObj;
   const found = players.find((p) => String(p._id) === String(id));
   return found?.name || null;
+}
+
+function applySuperSub(submission, pointsDoc) {
+  const players = submission?.players || [];
+  const nameSet = new Set(players.map((p) => normalizeName(p.name)));
+  const roleByName = new Map(players.map((p) => [normalizeName(p.name), p.role]));
+  const capName = submission?.captain?.name || getPlayerNameById(players, submission?.captain);
+  const vcName = submission?.viceCaptain?.name || getPlayerNameById(players, submission?.viceCaptain);
+  let effectiveCapName = capName || null;
+  let effectiveVcName = vcName || null;
+
+  const playingXI = normalizePlayingXI(pointsDoc?.playingXI || []);
+  const superSub = submission?.superSub || null;
+  if (!superSub || !playingXI.length) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
+  }
+  const superKey = normalizeName(superSub.name);
+  if (!superKey || !playingXI.includes(superKey)) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
+  }
+
+  const missing = players.filter((p) => !playingXI.includes(normalizeName(p.name)));
+  if (!missing.length) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
+  }
+
+  const capKey = normalizeName(effectiveCapName);
+  const vcKey = normalizeName(effectiveVcName);
+  let target = missing.find((p) => normalizeName(p.name) === capKey);
+  if (!target && vcKey) {
+    target = missing.find((p) => normalizeName(p.name) === vcKey);
+  }
+  if (!target) {
+    target = missing[0];
+  }
+  if (!target) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
+  }
+
+  const targetKey = normalizeName(target.name);
+  nameSet.delete(targetKey);
+  nameSet.add(superKey);
+  roleByName.set(superKey, superSub.role || roleByName.get(superKey) || "");
+
+  if (capKey && targetKey === capKey) {
+    effectiveCapName = superSub.name;
+  } else if (vcKey && targetKey === vcKey) {
+    effectiveVcName = superSub.name;
+  }
+
+  return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: true, superSubName: superSub.name };
 }
 
 function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByName = new Map(), boosterPlayerNameKey = null) {
@@ -108,25 +160,26 @@ async function teamPointsFromSubmissions(userId) {
     .populate("players")
     .populate("captain")
     .populate("viceCaptain")
+    .populate("superSub")
     .lean();
   if (!submissions.length) return 0;
   const matchIds = submissions.map((s) => s.matchId);
   const pointsDocs = await FantasyMatchPoints.find({ matchId: { $in: matchIds } }).lean();
-  const pointsMap = new Map(pointsDocs.map((d) => [String(d.matchId), d.points || []]));
+  const pointsMap = new Map(pointsDocs.map((d) => [String(d.matchId), d]));
   let total = 0;
   for (const s of submissions) {
-    const points = pointsMap.get(String(s.matchId)) || [];
-    const nameSet = new Set((s.players || []).map((p) => normalizeName(p.name)));
-    const roleByName = new Map((s.players || []).map((p) => [normalizeName(p.name), p.role]));
+    const pointsDoc = pointsMap.get(String(s.matchId)) || {};
+    const points = Array.isArray(pointsDoc.points) ? pointsDoc.points : [];
+    const applied = applySuperSub(s, pointsDoc);
     const boosterPlayerName = getPlayerNameById(s.players, s.boosterPlayer);
     const boosterPlayerKey = normalizeName(boosterPlayerName);
-    const filtered = points.filter((p) => nameSet.has(normalizeName(p.name)));
+    const filtered = points.filter((p) => applied.nameSet.has(normalizeName(p.name)));
     total += totalWithCaptaincy(
       filtered,
-      s.captain?.name,
-      s.viceCaptain?.name,
+      applied.capName,
+      applied.vcName,
       s.booster,
-      roleByName,
+      applied.roleByName,
       boosterPlayerKey || null
     );
   }
@@ -321,6 +374,7 @@ router.get("/me", authRequired, async (req, res) => {
     boosterType: team.boosterType || null,
     usedBoosters: team.usedBoosters || [],
     boosterPlayer: team.boosterPlayer || null,
+    superSub: team.superSub || null,
     lastSubmissionDate: team.lastSubmissionDate || null,
     submittedForDate: team.submittedForDate || null,
     submittedForMatchId: team.submittedForMatchId || null,
@@ -333,7 +387,7 @@ router.get("/me", authRequired, async (req, res) => {
 });
 
 router.post("/", authRequired, async (req, res) => {
-  const { name, playerIds, captainId, viceCaptainId, booster, boosterPlayerId, nextMatch: clientNextMatch } = req.body;
+  const { name, playerIds, captainId, viceCaptainId, booster, boosterPlayerId, superSubId, nextMatch: clientNextMatch } = req.body;
   if (!name || !Array.isArray(playerIds)) {
     return res.status(400).json({ error: "Missing fields" });
   }
@@ -363,6 +417,17 @@ router.post("/", authRequired, async (req, res) => {
   const players = await Player.find({ _id: { $in: uniqueIds } }).lean();
   if (players.length !== 11) {
     return res.status(400).json({ error: "Invalid players selected" });
+  }
+  let superSub = null;
+  if (superSubId) {
+    const superSubIdStr = String(superSubId);
+    if (uniqueIds.map(String).includes(superSubIdStr)) {
+      return res.status(400).json({ error: "Super Sub must not be in your XI." });
+    }
+    superSub = await Player.findById(superSubIdStr).lean();
+    if (!superSub) {
+      return res.status(400).json({ error: "Invalid Super Sub selection." });
+    }
   }
 
   if (!captainId || !viceCaptainId) {
@@ -470,6 +535,18 @@ router.post("/", authRequired, async (req, res) => {
     }
   }
 
+  if (superSub && window.nextMatch?.date) {
+    const alreadyUsed = await TeamSubmission.exists({
+      user: req.user.id,
+      matchDate: window.nextMatch.date,
+      superSub: { $ne: null },
+      matchId: { $ne: window.nextMatch.id }
+    });
+    if (alreadyUsed) {
+      return res.status(400).json({ error: "Super Sub already used for this match day." });
+    }
+  }
+
   const member = await League.exists({ members: req.user.id });
 
   if (existing) {
@@ -522,6 +599,7 @@ router.post("/", authRequired, async (req, res) => {
     existing.players = uniqueIds;
     existing.captain = captainId;
     existing.viceCaptain = viceCaptainId;
+    existing.superSub = superSub ? superSub._id : null;
     if (boosterType) {
       existing.boosterUsed = true;
       existing.boosterType = boosterType;
@@ -557,6 +635,7 @@ router.post("/", authRequired, async (req, res) => {
         players: uniqueIds,
         booster: boosterType,
         boosterPlayer: boosterType === "captainx3" ? boosterPlayerId : null,
+        superSub: superSub ? superSub._id : null,
         captain: captainId,
         viceCaptain: viceCaptainId
       },
@@ -576,6 +655,7 @@ router.post("/", authRequired, async (req, res) => {
       boosterType: existing.boosterType || null,
       usedBoosters: existing.usedBoosters || [],
       boosterPlayer: existing.boosterPlayer || null,
+      superSub: existing.superSub || null,
       lastSubmissionDate: existing.lastSubmissionDate || null,
       submittedForDate: existing.submittedForDate || null,
       submittedForMatchId: existing.submittedForMatchId || null,
@@ -603,6 +683,7 @@ router.post("/", authRequired, async (req, res) => {
     boosterType: boosterType || null,
     usedBoosters: boosterType ? [boosterType] : [],
     boosterPlayer: boosterType === "captainx3" ? boosterPlayerId : null,
+    superSub: superSub ? superSub._id : null,
     lastSubmissionDate: today,
     submittedForDate: window.nextMatch.date || today,
     submittedForMatchId: window.nextMatch.id,
@@ -626,6 +707,7 @@ router.post("/", authRequired, async (req, res) => {
       players: uniqueIds,
       booster: boosterType,
       boosterPlayer: boosterType === "captainx3" ? boosterPlayerId : null,
+      superSub: superSub ? superSub._id : null,
       captain: captainId,
       viceCaptain: viceCaptainId
     },
@@ -644,6 +726,7 @@ router.post("/", authRequired, async (req, res) => {
     boosterType: team.boosterType || null,
     usedBoosters: team.usedBoosters || [],
     boosterPlayer: team.boosterPlayer || null,
+    superSub: team.superSub || null,
     lastSubmissionDate: team.lastSubmissionDate || null,
     submittedForDate: team.submittedForDate || null,
     submittedForMatchId: team.submittedForMatchId || null,

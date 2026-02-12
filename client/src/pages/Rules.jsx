@@ -79,6 +79,20 @@ const RULES = [
       { label: "Finals transfer limit", value: "45" },
       { label: "Transfers are locked 5 seconds before match start until 5 minutes after", value: "" }
     ]
+  },
+  {
+    title: "Super Sub Rules",
+    items: [
+      { label: "Optional selection; can be left empty", value: "" },
+      { label: "Must be outside your submitted XI", value: "" },
+      { label: "Used only once per match day", value: "" },
+      { label: "Replaces the first non-playing XI member for that fixture", value: "" },
+      { label: "If Captain is out, Super Sub becomes Captain", value: "" },
+      { label: "If Vice-Captain is out, Super Sub becomes Vice-Captain", value: "" },
+      { label: "If both are out, Captain takes priority", value: "" },
+      { label: "Inherits any boosters applied for the fixture", value: "" },
+      { label: "Applied when playing XI is available from CricAPI", value: "" }
+    ]
   }
 ];
 
