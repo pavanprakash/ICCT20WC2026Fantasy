@@ -109,7 +109,7 @@ export default function ViewSubmission() {
       ) : null}
 
       <div className="muted">
-        <Link to="/points">← Back to View Points</Link>
+        <Link to="/points" className="link--back">← Back to View Points</Link>
       </div>
 
       {status === "error" && <div className="notice">Failed to load submission.</div>}

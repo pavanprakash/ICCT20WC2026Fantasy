@@ -912,12 +912,14 @@ export default function TeamBuilder() {
 
       <div className="team-builder">
         <div className="team-panel">
-          <label className="label">Team Name</label>
-          <input
-            className="input"
-            value={teamName}
-            onChange={(e) => setTeamName(e.target.value)}
-          />
+          <div className="team-name-field">
+            <label className="label">Team Name</label>
+            <input
+              className="input"
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+            />
+          </div>
           <div className="summary">
             <div>
               <span className="muted">Players</span>
@@ -965,7 +967,7 @@ export default function TeamBuilder() {
             <div className="notice">Free changes until your first match starts.</div>
           ) : null}
           {teamMeta?.lockedInLeague ? (
-            <div className="transfer-summary">
+            <div className="transfer-summary transfer-summary--team">
               <div>Transfers this round: <strong>{transfersUsedThisRound}</strong></div>
               <div>Transfers used: <strong>{teamMeta.transfersUsedTotal ?? 0}</strong></div>
               <div>Transfers remaining: <strong>{transfersRemaining ?? 0}</strong> / {teamMeta.transfersLimit ?? 120}</div>
@@ -997,7 +999,7 @@ export default function TeamBuilder() {
               Auto Populate Team
             </button>
           )}
-          <div className="panel-block">
+          <div className="panel-block panel-block--captains">
             <div className="filter-group">
               <label className="label">Captain</label>
               <select
@@ -1056,7 +1058,7 @@ export default function TeamBuilder() {
               <div className="muted">Replaces the first non-playing XI member for this fixture.</div>
             </div>
           </div>
-          <div className="panel-block">
+          <div className="panel-block panel-block--fixtures">
             <div className="panel-title">Upcoming Fixtures (GMT)</div>
             {nextMatch?.date ? (
               <div className="muted">Next match date: {nextMatch.date}</div>
@@ -1081,7 +1083,7 @@ export default function TeamBuilder() {
               </div>
             )}
           </div>
-          <div className="muted">
+          <div className="muted formation-limits">
             Formation limits: min 3 batters, 3 bowlers, 1 wicket-keeper, 1 all-rounder. Max 5 batters, 5 bowlers, 4 wicket-keepers, 4 all-rounders.
           </div>
           <button
@@ -1347,8 +1349,8 @@ export default function TeamBuilder() {
               />
             </div>
             <div className="filter-group">
-              <label className="label">Team</label>
-              <div className={`multi-select ${teamDropdownOpen ? "multi-select--open" : ""}`}>
+              <label className="label label--team-filter">Team</label>
+              <div className={`multi-select multi-select--team ${teamDropdownOpen ? "multi-select--open" : ""}`}>
                 <button
                   type="button"
                   className="input multi-select__toggle"
@@ -1415,7 +1417,7 @@ export default function TeamBuilder() {
                 ))}
               </select>
             </div>
-            <div className="filter-meta muted">
+            <div className="filter-meta filter-meta--team muted">
               Showing {filteredPlayers.length} of {players.length}
             </div>
           </div>
@@ -1431,7 +1433,7 @@ export default function TeamBuilder() {
           ) : null}
 
           {playersStatus === "ready" && filteredPlayers.length === 0 ? (
-            <div className="panel-block">
+            <div className="panel-block panel-block--empty">
               <div className="muted">No players match your filters.</div>
             </div>
           ) : null}

@@ -37,7 +37,7 @@ export default function Leaderboard() {
       </div>
 
       {leagueStandings.length > 0 && (
-        <div className="panel-block">
+        <div className="panel-block league-standings">
           <div className="panel-title">Your League Rankings</div>
           {leagueStandings.map((league) => (
             <div key={league.id} className="panel-block">

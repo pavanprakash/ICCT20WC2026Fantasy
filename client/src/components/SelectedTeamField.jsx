@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import defaultPlayer from "../assets/default-player.svg";
 
 const roleBuckets = (players = []) => {
   const buckets = {
@@ -35,27 +36,29 @@ const initials = (name = "") =>
 
 const formatPrice = (value) => Number(value || 0).toFixed(1);
 
+const teamCode = (value = "") =>
+  String(value || "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 3)
+    .toUpperCase();
+
 const PlayerChip = ({ player, isCaptain, isViceCaptain, canEdit, onRemove, pointsByName }) => {
   const key = String(player.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const points = pointsByName?.get ? pointsByName.get(key) : null;
   return (
   <div className="player-chip">
     <div className="player-chip__avatar">
-      {initials(player.name)}
-      {(isCaptain || isViceCaptain) && (
-        <span className={`badge ${isCaptain ? "badge--captain" : "badge--vc"}`}>
-          {isCaptain ? "C" : "V/C"}
-        </span>
-      )}
+      <img src={defaultPlayer} alt={player.name || "Player"} loading="lazy" />
+      <span className="player-chip__team">{teamCode(player.country || player.team)}</span>
     </div>
-    <div className="player-chip__meta">
-      <div className="player-chip__name">{player.name}</div>
-      <div className="player-chip__details">
-        <span className="player-chip__country">{player.country || "—"}</span>
-        <span className="player-chip__price">£{formatPrice(player.price)}m</span>
-        {points != null ? <span className="player-chip__points">Pts {points}</span> : null}
-      </div>
-    </div>
+    {(isCaptain || isViceCaptain) && (
+      <span className={`badge ${isCaptain ? "badge--captain" : "badge--vc"}`}>
+        {isCaptain ? "C" : "V/C"}
+      </span>
+    )}
+    <div className="player-chip__name">{player.name}</div>
+    <div className="player-chip__price">£{formatPrice(player.price)}m</div>
+    {points != null ? <div className="player-chip__points">Pts {points}</div> : null}
     {canEdit && (
       <button
         type="button"
