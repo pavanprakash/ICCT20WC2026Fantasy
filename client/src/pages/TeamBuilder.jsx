@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "../api.js";
 import fixtures from "../data/fixtures-2026.js";
 import SelectedTeamField from "../components/SelectedTeamField.jsx";
+import { countryFlag } from "../utils/flags.js";
 import batsmanBooster from "../assets/Batsman-Booster.png";
 import bowlerBooster from "../assets/Bowler-Booster.png";
 import wkBooster from "../assets/Booster-Wk.png";
@@ -85,6 +86,8 @@ export default function TeamBuilder() {
   const [priceRange, setPriceRange] = useState("all");
   const [fixtureDay, setFixtureDay] = useState([]);
   const [fixtureStatus, setFixtureStatus] = useState("loading");
+  const [fixturesAll, setFixturesAll] = useState([]);
+  const [fixtureDateFilter, setFixtureDateFilter] = useState("");
   const [nextMatch, setNextMatch] = useState(null);
   const [teamMeta, setTeamMeta] = useState(null);
   const [submissionLock, setSubmissionLock] = useState({ locked: false, message: null });
@@ -174,6 +177,7 @@ export default function TeamBuilder() {
       .then((res) => {
         if (!mounted) return;
         const matches = res.data?.matches || [];
+        const todayKey = todayUtc();
         const { lockMatch, nextMatch: upcoming } = computeMatchWindow(matches);
         if (!matches.length) {
           const local = fixtures.map((m) => ({
@@ -181,9 +185,13 @@ export default function TeamBuilder() {
             timeGMT: m.timeGMT || m.time || null
           }));
           const localWindow = computeMatchWindow(local);
+          setFixturesAll(local);
           setNextMatch(localWindow.nextMatch || null);
-          setFixtureDay(local.filter((m) => m.date === (localWindow.nextMatch?.date || nextFixtureDateUtc())));
-          setFixtureStatus(local.length ? "ok" : "empty");
+          const initialDate = todayKey || localWindow.nextMatch?.date || nextFixtureDateUtc();
+          setFixtureDateFilter(initialDate);
+          const initialMatches = local.filter((m) => m.date === initialDate);
+          setFixtureDay(initialMatches);
+          setFixtureStatus(initialMatches.length ? "ok" : "empty");
           setLockMeta({
             firstStart: localWindow.nextMatch?.startMs || null,
             lockUntil: localWindow.nextMatch?.startMs ? localWindow.nextMatch.startMs + LOCK_AFTER_MS : null
@@ -196,6 +204,7 @@ export default function TeamBuilder() {
           });
           return;
         }
+        setFixturesAll(matches);
         setNextMatch(upcoming || null);
         if (upcoming?.startMs) {
           setLockMeta({
@@ -211,7 +220,8 @@ export default function TeamBuilder() {
             ? "Submissions locked from 5 seconds before match start until 5 minutes after it starts."
             : null
         });
-        const focusDate = (upcoming && upcoming.date) || nextFixtureDateUtc();
+        const focusDate = todayKey || (upcoming && upcoming.date) || nextFixtureDateUtc();
+        setFixtureDateFilter(focusDate);
         const focusMatches = matches.filter((m) => m.date === focusDate);
         setFixtureDay(focusMatches);
         setFixtureStatus(focusMatches.length ? "ok" : "empty");
@@ -220,6 +230,8 @@ export default function TeamBuilder() {
         if (!mounted) return;
         const dateKey = nextFixtureDateUtc();
         const localTodays = fixtures.filter((m) => m.date === dateKey);
+        setFixturesAll(fixtures);
+        setFixtureDateFilter(dateKey);
         setFixtureDay(localTodays);
         setFixtureStatus(localTodays.length ? "ok" : "error");
         const firstLocal = localTodays.map((m) => m.timeGMT).filter(Boolean).sort()[0];
@@ -285,6 +297,18 @@ export default function TeamBuilder() {
       timers.forEach((t) => clearTimeout(t));
     };
   }, [fixtureDay, nextMatch]);
+
+  const fixtureDates = useMemo(() => {
+    const set = new Set((fixturesAll || []).map((m) => m.date).filter(Boolean));
+    return Array.from(set).sort();
+  }, [fixturesAll]);
+
+  useEffect(() => {
+    if (!fixtureDateFilter) return;
+    const matches = (fixturesAll || []).filter((m) => m.date === fixtureDateFilter);
+    setFixtureDay(matches);
+    setFixtureStatus(matches.length ? "ok" : "empty");
+  }, [fixtureDateFilter, fixturesAll]);
 
   useEffect(() => {
     let mounted = true;
@@ -602,6 +626,10 @@ export default function TeamBuilder() {
           return;
         }
       }
+      if (superSubId && selected.includes(superSubId)) {
+        focusStatus("Super sub cannot be one amongst the submitted team.");
+        return;
+      }
 
       const res = await api.post("/teams", {
         name: teamName,
@@ -624,6 +652,7 @@ export default function TeamBuilder() {
           : null
       });
       if (res.data) {
+        const nextSuperSubId = res.data.superSub ? String(res.data.superSub) : "";
         setTeamMeta((prev) => ({
           lockedInLeague: res.data.lockedInLeague ?? prev?.lockedInLeague ?? false,
           transfersLimit: res.data.transfersLimit ?? prev?.transfersLimit ?? 120,
@@ -640,6 +669,7 @@ export default function TeamBuilder() {
           boosterPlayer: res.data.boosterPlayer ?? prev?.boosterPlayer ?? null,
           superSub: res.data.superSub ?? prev?.superSub ?? null
         }));
+        setSuperSubId(nextSuperSubId);
         if (superSubId && nextMatch?.date) {
           setSubmissionHistory((prev) => {
             const exists = prev.some((s) => s.matchId === nextMatch.id);
@@ -686,9 +716,11 @@ export default function TeamBuilder() {
     });
     if (!used) return null;
     const fixtureName = used.matchName || (used.team1 && used.team2 ? `${used.team1} vs ${used.team2}` : "this fixture");
-    return { used: true, fixtureName };
+    return { used: true, fixtureName, matchId: used.matchId };
   }, [submissionHistory, nextMatch?.date]);
-  const superSubDisabled = boosterDisabled || Boolean(superSubUsage?.used);
+  const superSubDisabled = boosterDisabled || (Boolean(superSubUsage?.used) && (
+    submissionLock.locked || !isEditing
+  ));
   const boosterLabel = (type) => {
     switch (type) {
       case "batsman":
@@ -710,6 +742,7 @@ export default function TeamBuilder() {
 
   const handleBoosterToggle = (type) => {
     if (boosterDisabled || usedBoosters.includes(type)) return;
+    if (boosterSelected && boosterSelected !== type) return;
     if (boosterSelected === type) {
       setBoosterSelected(null);
       setBoosterPlayerId("");
@@ -721,6 +754,22 @@ export default function TeamBuilder() {
     }
     setBoosterSelected(type);
     setStatus(`${boosterLabel(type)} applied. Submit team to confirm.`);
+    setTimeout(() => {
+      statusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+  };
+
+  const handleCaptainX3Pick = (player) => {
+    if (boosterSelected !== "captainx3") return;
+    if (String(player._id) === String(captainId) || String(player._id) === String(viceCaptainId)) {
+      setStatus("CAPTAIN X3 player cannot be captain or vice-captain.");
+      setTimeout(() => {
+        statusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 0);
+      return;
+    }
+    setBoosterPlayerId(String(player._id));
+    setStatus(`CAPTAIN X3 set for ${player.name}.`);
     setTimeout(() => {
       statusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 0);
@@ -843,24 +892,7 @@ export default function TeamBuilder() {
 
   useEffect(() => {
     if (!teamMeta || !isEditing) return;
-    setEditSecondsLeft(240);
-    const id = setTimeout(() => {
-      setSelected(savedTeam.players || []);
-      setCaptainId(savedTeam.captainId || "");
-      setViceCaptainId(savedTeam.viceCaptainId || "");
-      setIsEditing(false);
-      setEditSecondsLeft(0);
-      setStatus("Edit timed out. Reverted to saved team.");
-    }, 240000);
-    return () => clearTimeout(id);
-  }, [teamMeta, isEditing, savedTeam]);
-
-  useEffect(() => {
-    if (!teamMeta || !isEditing) return;
-    const tick = setInterval(() => {
-      setEditSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(tick);
+    setEditSecondsLeft(0);
   }, [teamMeta, isEditing]);
 
   useEffect(() => {
@@ -878,12 +910,7 @@ export default function TeamBuilder() {
     setSelected((prev) => prev.filter((s) => String(s) !== String(id)));
   };
 
-  const editTimerLabel = useMemo(() => {
-    const total = Math.max(0, editSecondsLeft || 0);
-    const minutes = String(Math.floor(total / 60)).padStart(2, "0");
-    const seconds = String(total % 60).padStart(2, "0");
-    return `${minutes}:${seconds}`;
-  }, [editSecondsLeft]);
+  const editTimerLabel = useMemo(() => "", []);
 
   useEffect(() => {
     if (!status) return;
@@ -1048,7 +1075,7 @@ export default function TeamBuilder() {
                 onChange={(e) => setSuperSubId(e.target.value)}
                 disabled={superSubDisabled}
               >
-                <option value="">No super sub</option>
+                <option value="">Select</option>
                 {superSubOptions.map((player) => (
                   <option key={`ss-${player._id}`} value={player._id}>
                     {player.name}
@@ -1060,6 +1087,20 @@ export default function TeamBuilder() {
           </div>
           <div className="panel-block panel-block--fixtures">
             <div className="panel-title">Upcoming Fixtures (GMT)</div>
+            {fixtureDates.length > 0 ? (
+              <div className="fixture-date-select">
+                <label className="label">Fixture date</label>
+                <select
+                  className="input"
+                  value={fixtureDateFilter}
+                  onChange={(e) => setFixtureDateFilter(e.target.value)}
+                >
+                  {fixtureDates.map((date) => (
+                    <option key={date} value={date}>{date}</option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             {nextMatch?.date ? (
               <div className="muted">Next match date: {nextMatch.date}</div>
             ) : null}
@@ -1129,7 +1170,7 @@ export default function TeamBuilder() {
             <div className="booster-grid">
               <div
                 className={`booster-card ${boosterSelected === "batsman" ? "booster-card--active" : ""} ${usedBoosters.includes("batsman") ? "booster-card--used" : ""}`}
-                aria-disabled={boosterDisabled || usedBoosters.includes("batsman")}
+                aria-disabled={boosterDisabled || usedBoosters.includes("batsman") || (boosterSelected && boosterSelected !== "batsman")}
                 role="button"
                 tabIndex={0}
                 onClick={() => handleBoosterToggle("batsman")}
@@ -1158,7 +1199,7 @@ export default function TeamBuilder() {
               </div>
               <div
                 className={`booster-card ${boosterSelected === "bowler" ? "booster-card--active" : ""} ${usedBoosters.includes("bowler") ? "booster-card--used" : ""}`}
-                aria-disabled={boosterDisabled || usedBoosters.includes("bowler")}
+                aria-disabled={boosterDisabled || usedBoosters.includes("bowler") || (boosterSelected && boosterSelected !== "bowler")}
                 role="button"
                 tabIndex={0}
                 onClick={() => handleBoosterToggle("bowler")}
@@ -1187,7 +1228,7 @@ export default function TeamBuilder() {
               </div>
               <div
                 className={`booster-card ${boosterSelected === "wk" ? "booster-card--active" : ""} ${usedBoosters.includes("wk") ? "booster-card--used" : ""}`}
-                aria-disabled={boosterDisabled || usedBoosters.includes("wk")}
+                aria-disabled={boosterDisabled || usedBoosters.includes("wk") || (boosterSelected && boosterSelected !== "wk")}
                 role="button"
                 tabIndex={0}
                 onClick={() => handleBoosterToggle("wk")}
@@ -1216,7 +1257,7 @@ export default function TeamBuilder() {
               </div>
               <div
                 className={`booster-card ${boosterSelected === "allrounder" ? "booster-card--active" : ""} ${usedBoosters.includes("allrounder") ? "booster-card--used" : ""}`}
-                aria-disabled={boosterDisabled || usedBoosters.includes("allrounder")}
+                aria-disabled={boosterDisabled || usedBoosters.includes("allrounder") || (boosterSelected && boosterSelected !== "allrounder")}
                 role="button"
                 tabIndex={0}
                 onClick={() => handleBoosterToggle("allrounder")}
@@ -1245,7 +1286,7 @@ export default function TeamBuilder() {
               </div>
               <div
                 className={`booster-card ${boosterSelected === "teamx2" ? "booster-card--active" : ""} ${usedBoosters.includes("teamx2") ? "booster-card--used" : ""}`}
-                aria-disabled={boosterDisabled || usedBoosters.includes("teamx2")}
+                aria-disabled={boosterDisabled || usedBoosters.includes("teamx2") || (boosterSelected && boosterSelected !== "teamx2")}
                 role="button"
                 tabIndex={0}
                 onClick={() => handleBoosterToggle("teamx2")}
@@ -1274,7 +1315,7 @@ export default function TeamBuilder() {
               </div>
               <div
                 className={`booster-card ${boosterSelected === "captainx3" ? "booster-card--active" : ""} ${usedBoosters.includes("captainx3") ? "booster-card--used" : ""}`}
-                aria-disabled={boosterDisabled || usedBoosters.includes("captainx3")}
+                aria-disabled={boosterDisabled || usedBoosters.includes("captainx3") || (boosterSelected && boosterSelected !== "captainx3")}
                 role="button"
                 tabIndex={0}
                 onClick={() => handleBoosterToggle("captainx3")}
@@ -1303,37 +1344,21 @@ export default function TeamBuilder() {
               </div>
             </div>
             {boosterSelected === "captainx3" && (
-              <div className="booster-select">
-                <label className="label">Select player (cannot be Captain or Vice-Captain)</label>
-                <select
-                  className="input"
-                  value={boosterPlayerId}
-                  onChange={(e) => setBoosterPlayerId(e.target.value)}
-                >
-                  <option value="">Select player</option>
-                  {selectedPlayers
-                    .filter((p) => String(p._id) !== String(captainId) && String(p._id) !== String(viceCaptainId))
-                    .map((player) => (
-                      <option key={`bx3-${player._id}`} value={player._id}>
-                        {player.name}
-                      </option>
-                    ))}
-                </select>
+              <div className="booster-select booster-select--hint">
+                Click a player in Selected XI to apply CAPTAIN X3.
               </div>
             )}
             <div className="booster-hint">Use once during the tournament. Apply when updating your team.</div>
           </div>
           <div className="panel-block">
             <div className="panel-title">Selected XI</div>
-            {superSubUsage?.used ? (
-              <div className="super-sub-used">
-                You have already used Super Sub against {superSubUsage.fixtureName}.
-              </div>
-            ) : null}
             <SelectedTeamField
               players={selectedPlayers}
               captainId={captainId}
               viceCaptainId={viceCaptainId}
+              captainX3PlayerId={boosterPlayerId}
+              showCaptainX3Prompt={boosterSelected === "captainx3" && !boosterPlayerId}
+              onCaptainX3Pick={handleCaptainX3Pick}
               canEdit={!teamMeta || isEditing}
               onRemove={handleRemove}
             />
@@ -1462,7 +1487,14 @@ export default function TeamBuilder() {
                       <span className="pill">{player.role}</span>
                     </div>
                   </div>
-                  <div className="muted">{player.country}</div>
+                  {(() => {
+                    const flag = countryFlag(player.country);
+                    return (
+                      <div className="player-flag">
+                        {flag.type === "img" ? <img src={flag.value} alt={`${player.country} flag`} /> : flag.value}
+                      </div>
+                    );
+                  })()}
                   <div className="card__footer">
                     <span className="price">Price £{formatPrice(player.price)}m</span>
                     <span className="points">Total Pts {player.points}</span>

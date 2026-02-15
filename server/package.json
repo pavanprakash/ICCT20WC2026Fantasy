@@ -9,10 +9,17 @@
     "seed": "node src/seed.js",
     "apply:pricing": "node src/scripts/applyPricing.js",
     "sync:fantasy": "node src/scripts/syncFantasyPoints.js",
+    "manual:match": "node src/scripts/manualMatchPoints.js",
+    "backfill:supersub": "node src/scripts/backfillSuperSubApplied.js",
+    "backfill:player-img": "node src/scripts/backfillPlayerImages.js",
+    "sync:match": "node src/scripts/syncSingleMatch.js",
     "reset:password": "node src/scripts/resetPassword.js",
     "backfill:submissions": "node src/scripts/backfillSubmissions.js",
     "backfill:first-submit": "node src/scripts/backfillFirstSubmittedMatchStart.js",
-    "backfill:boosters": "node src/scripts/backfillUsedBoosters.js"
+    "backfill:boosters": "node src/scripts/backfillUsedBoosters.js",
+    "backfill:playing-xi": "node src/scripts/backfillPlayingXI.js",
+    "auto-submit:match": "node src/scripts/autoSubmitMatch.js",
+    "auto-submit:fix-match": "node src/scripts/fixAutoSubmissionsForMatch.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

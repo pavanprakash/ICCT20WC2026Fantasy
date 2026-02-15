@@ -116,12 +116,12 @@ export default function ViewSubmission() {
 
       {submission && (
         <>
-          <div className="panel-block">
+          <div className="panel-block points-panel">
               <div className="panel-title">Total Points</div>
               <div className="points-accent">{submission.totalPoints}</div>
             </div>
           {breakdown.length ? (
-            <div className="panel-block">
+            <div className="panel-block points-panel">
               <div className="panel-title">Points Breakdown</div>
               <div className="table table--points">
                 <div className="table__row table__head">

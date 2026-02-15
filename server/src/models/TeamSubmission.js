@@ -16,7 +16,12 @@ const TeamSubmissionSchema = new mongoose.Schema(
     superSub: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
     players: [{ type: mongoose.Schema.Types.ObjectId, ref: "Player", required: true }],
     captain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
-    viceCaptain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null }
+    viceCaptain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
+    superSubApplied: { type: Boolean, default: false },
+    superSubReplaced: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
+    superSubEffectivePlayers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Player" }],
+    superSubEffectiveCaptain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null },
+    superSubEffectiveViceCaptain: { type: mongoose.Schema.Types.ObjectId, ref: "Player", default: null }
   },
   { timestamps: true }
 );

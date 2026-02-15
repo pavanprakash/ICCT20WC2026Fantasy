@@ -49,7 +49,8 @@ export const DEFAULT_RULESET = {
     captainMultiplier: 2,
     viceCaptainMultiplier: 1.5,
     announcedLineup: 4,
-    playingSubstitute: 4
+    playingSubstitute: 4,
+    playingXI: 4
   }
 };
 
@@ -225,4 +226,24 @@ export function calculateMatchPoints(scorecardData, rules) {
   }));
 
   return points.sort((a, b) => b.total - a.total);
+}
+
+export function applyPlayingXIPoints(points = [], playingXI = [], bonus = 2) {
+  const list = Array.isArray(points) ? points.map((p) => ({ ...p })) : [];
+  const lookup = new Map(list.map((p) => [normalizeName(p.name), p]));
+  const xi = Array.isArray(playingXI) ? playingXI : [];
+  xi.forEach((name) => {
+    const key = normalizeName(name);
+    if (!key) return;
+    const current = lookup.get(key);
+    if (current) {
+      current.appearance = (current.appearance || 0) + bonus;
+      current.total = (current.total || 0) + bonus;
+    } else {
+      const entry = { name, batting: 0, bowling: 0, fielding: 0, appearance: bonus, total: bonus };
+      list.push(entry);
+      lookup.set(key, entry);
+    }
+  });
+  return list.sort((a, b) => b.total - a.total);
 }

@@ -478,6 +478,28 @@ main {
   pointer-events: none;
 }
 
+.team-field__prompt {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.7);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.team-field__prompt-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
 .field-section {
   display: grid;
   gap: 12px;
@@ -531,14 +553,22 @@ main {
   position: relative;
 }
 
+.player-chip--selectable {
+  cursor: pointer;
+}
+
+.player-chip--selectable:hover .player-chip__avatar {
+  box-shadow: 0 0 0 3px rgba(255, 106, 61, 0.7);
+}
+
 .player-chip__avatar {
-  width: 74px;
-  height: 90px;
-  border-radius: 50% / 60%;
+  width: 72px;
+  height: 88px;
+  border-radius: 18px 18px 36px 36px;
   display: grid;
   place-items: center;
   background: #1f2937;
-  border: 3px solid rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.25);
   position: relative;
   overflow: hidden;
 }
@@ -547,6 +577,7 @@ main {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top center;
 }
 
 .player-chip__team {
@@ -560,6 +591,19 @@ main {
   padding: 2px 6px;
   border-radius: 8px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.player-chip__flag {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.player-chip__flag img,
+.player-flag img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  display: block;
 }
 
 .badge {
@@ -581,6 +625,13 @@ main {
 
 .badge--vc {
   background: #7a3c0b;
+}
+
+.badge--captainx3 {
+  background: #ff6a3d;
+  color: #ffffff;
+  top: -6px;
+  right: -6px;
 }
 
 .player-chip__meta {
@@ -612,6 +663,11 @@ main {
 
 .player-chip__country {
   display: none;
+}
+
+.player-flag {
+  font-size: 30px;
+  line-height: 1;
 }
 
 .player-chip__points {
@@ -715,6 +771,12 @@ main {
 }
 
 .link--back {
+  color: #ffffff;
+}
+
+.points-panel .panel-title,
+.points-panel .table__row span,
+.points-panel .table__head span {
   color: #ffffff;
 }
 
@@ -999,6 +1061,15 @@ main {
   color: #0b0f1a;
 }
 
+.booster-select--hint {
+  color: #ffffff;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
 .booster-select {
   display: grid;
   gap: 6px;
@@ -1073,15 +1144,15 @@ main {
 }
 
 .notice--success {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  color: #166534;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  color: #111827;
 }
 
 .notice--info {
-  background: rgba(59, 91, 214, 0.12);
-  border: 1px solid rgba(59, 91, 214, 0.3);
-  color: #2542a8;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  color: #111827;
 }
 
 .label {
@@ -1198,6 +1269,12 @@ main {
 .panel-block--fixtures .fixture-mini__teams,
 .panel-block--fixtures .muted {
   color: #000000;
+}
+
+.fixture-date-select {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .label--team-filter {

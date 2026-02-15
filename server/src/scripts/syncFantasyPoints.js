@@ -4,7 +4,7 @@ import FantasyRule from "../models/FantasyRule.js";
 import FantasyMatchPoints from "../models/FantasyMatchPoints.js";
 import Player from "../models/Player.js";
 import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
-import { calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
+import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
 import { getPlayingXI } from "../services/playingXI.js";
 
 dotenv.config();
@@ -33,6 +33,13 @@ function isCompletedScorecard(scoreData) {
   if (scoreData?.matchEnded === true) return true;
   const status = String(scoreData?.status || scoreData?.matchStatus || "").toLowerCase();
   return /match ended|result|won|abandoned|no result|draw|tied|complete|completed|match over|finished/.test(status);
+}
+
+function isNotStartedMatch(match) {
+  const ms = String(match?.ms || "").toLowerCase();
+  if (ms === "fixture" || ms === "upcoming" || ms === "scheduled") return true;
+  const status = String(match?.status || match?.matchStatus || "").toLowerCase();
+  return /not started|upcoming|fixture|scheduled|starts at/.test(status);
 }
 
 
@@ -127,9 +134,27 @@ async function run() {
   const aggregate = new Map();
   let processed = 0;
 
+  const existingDocs = await FantasyMatchPoints.find({ ruleset: rules.name }).lean();
+  const existingMap = new Map(existingDocs.map((d) => [String(d.matchId), d]));
+
   for (const match of matches) {
     const matchId = match?.id || match?.match_id || match?.matchId || match?.unique_id;
     if (!matchId) continue;
+    if (isNotStartedMatch(match)) {
+      if (debug) {
+        console.log(JSON.stringify({ debug: true, matchId, message: "Skipping not-started match" }));
+      }
+      continue;
+    }
+
+    const existing = existingMap.get(String(matchId));
+    if (existing && Array.isArray(existing.points) && existing.points.length > 0 && isCompletedMatch(match)) {
+      if (debug) {
+        console.log(JSON.stringify({ debug: true, matchId, message: "Skipping completed match already scored" }));
+      }
+      continue;
+    }
+
     const safe = await cricapiGetScorecardSafe(matchId, SCORECARD_KEY);
     if (safe.skipped) {
       console.warn(
@@ -151,20 +176,26 @@ async function run() {
       }
       continue;
     }
-    const scoreRoot = safe.data?.data;
-    if (match?.matchEnded !== true && !isCompletedMatch(match) && !isCompletedScorecard(scoreRoot)) {
-      continue;
-    }
+    const scoreRoot =
+      safe.data?.data ||
+      safe.data?.scorecard ||
+      safe.data?.innings ||
+      safe.data;
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
     const playingXI = getPlayingXI(scoreRoot);
-    const points = calculateMatchPoints(scorecard, rules);
+    const playingXIBonus = Number(rules?.additional?.playingXI ?? 2);
+    const points = applyPlayingXIPoints(
+      calculateMatchPoints(scorecard, rules),
+      playingXI,
+      playingXIBonus
+    );
     if (!points.length) {
       if (debug) {
-        const topKeys = scoreData && typeof scoreData === "object" ? Object.keys(scoreData).slice(0, 20) : [];
+        const topLevelKeys = safe.data && typeof safe.data === "object" ? Object.keys(safe.data).slice(0, 20) : [];
         const dataKeys = scoreRoot && typeof scoreRoot === "object" ? Object.keys(scoreRoot).slice(0, 20) : [];
-        const status = scoreData?.status || scoreRoot?.status || scoreRoot?.matchStatus || null;
-        const message = scoreData?.message || scoreRoot?.message || null;
-        const reason = scoreData?.reason || null;
+        const status = scoreRoot?.status || scoreRoot?.matchStatus || null;
+        const message = scoreRoot?.message || null;
+        const reason = scoreRoot?.reason || null;
         const rootKeys = scoreRoot && typeof scoreRoot === "object" ? Object.keys(scoreRoot).slice(0, 20) : [];
         const inningsArr = Array.isArray(scoreRoot?.innings) ? scoreRoot.innings : null;
         const scorecardArr = Array.isArray(scoreRoot?.scorecard) ? scoreRoot.scorecard : null;
@@ -176,7 +207,7 @@ async function run() {
             apiStatus: status,
             apiMessage: message,
             apiReason: reason,
-            topKeys,
+            topLevelKeys,
             dataKeys,
             rootKeys,
             inningsLength: inningsArr ? inningsArr.length : null,

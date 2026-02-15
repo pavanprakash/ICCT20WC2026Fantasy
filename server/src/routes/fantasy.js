@@ -6,7 +6,7 @@ import Team from "../models/Team.js";
 import TeamSubmission from "../models/TeamSubmission.js";
 import { authRequired } from "../middleware/auth.js";
 import { cricapiGet } from "../services/cricapi.js";
-import { calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
+import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
 import { getPlayingXI, normalizePlayingXI } from "../services/playingXI.js";
 
 const router = express.Router();
@@ -71,7 +71,47 @@ function applySuperSub(submission, pointsDoc) {
   let effectiveVcName = vcName || null;
 
   const playingXI = normalizePlayingXI(pointsDoc?.playingXI || []);
+  const team1 = submission?.team1 || pointsDoc?.team1 || "";
+  const team2 = submission?.team2 || pointsDoc?.team2 || "";
+  const team1Key = normalizeName(team1);
+  const team2Key = normalizeName(team2);
+  const teamMatches = (p) => {
+    const country = normalizeName(p?.country || "");
+    return (team1Key && country === team1Key) || (team2Key && country === team2Key);
+  };
+  const hasTeamMatch = players.some(teamMatches);
+  const playingMatchesTeam = playingXI.some((name) =>
+    players.some((p) => normalizeName(p.name) === name && teamMatches(p))
+  );
+  if (hasTeamMatch && !playingMatchesTeam) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
+  }
   const superSub = submission?.superSub || null;
+
+  if (
+    submission?.superSubApplied &&
+    Array.isArray(submission?.superSubEffectivePlayers) &&
+    submission.superSubEffectivePlayers.length
+  ) {
+    const idSet = new Set(submission.superSubEffectivePlayers.map((id) => String(id)));
+    const effectivePlayers = players.filter((p) => idSet.has(String(p._id)));
+    if (superSub && idSet.has(String(superSub._id)) && !effectivePlayers.some((p) => String(p._id) === String(superSub._id))) {
+      effectivePlayers.push(superSub);
+    }
+    const effectiveCap = submission?.superSubEffectiveCaptain || submission?.captain;
+    const effectiveVc = submission?.superSubEffectiveViceCaptain || submission?.viceCaptain;
+    const effectiveCapNameStored = getPlayerNameById(effectivePlayers, effectiveCap);
+    const effectiveVcNameStored = getPlayerNameById(effectivePlayers, effectiveVc);
+    return {
+      nameSet: new Set(effectivePlayers.map((p) => normalizeName(p.name))),
+      roleByName: new Map(effectivePlayers.map((p) => [normalizeName(p.name), p.role])),
+      capName: effectiveCapNameStored || null,
+      vcName: effectiveVcNameStored || null,
+      superSubUsed: true,
+      superSubName: superSub?.name
+    };
+  }
+
   if (!superSub || !playingXI.length) {
     return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
   }
@@ -205,8 +245,13 @@ router.get("/score/:matchId", async (req, res) => {
     }
     const scoreRoot = safe.data?.data;
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
-
-    const points = calculateMatchPoints(scorecard, rules);
+    const playingXI = getPlayingXI(scoreRoot);
+    const playingXIBonus = Number(rules?.additional?.playingXI ?? 2);
+    const points = applyPlayingXIPoints(
+      calculateMatchPoints(scorecard, rules),
+      playingXI,
+      playingXIBonus
+    );
 
     const warnings = [
       "Dot ball points and LBW/Bowled bonuses require ball-by-ball data and are not applied.",
@@ -276,7 +321,12 @@ router.post("/sync", async (req, res) => {
       }
       const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
       const playingXI = getPlayingXI(scoreRoot);
-      const points = calculateMatchPoints(scorecard, rules);
+      const playingXIBonus = Number(rules?.additional?.playingXI ?? 2);
+      const points = applyPlayingXIPoints(
+        calculateMatchPoints(scorecard, rules),
+        playingXI,
+        playingXIBonus
+      );
       if (!points.length) {
         continue;
       }

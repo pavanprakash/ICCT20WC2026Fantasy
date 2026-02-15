@@ -46,7 +46,47 @@ function applySuperSub(submission, pointsDoc) {
   let effectiveVcName = vcName || null;
 
   const playingXI = normalizePlayingXI(pointsDoc?.playingXI || []);
+  const team1 = submission?.team1 || pointsDoc?.team1 || "";
+  const team2 = submission?.team2 || pointsDoc?.team2 || "";
+  const team1Key = normalizeName(team1);
+  const team2Key = normalizeName(team2);
+  const teamMatches = (p) => {
+    const country = normalizeName(p?.country || "");
+    return (team1Key && country === team1Key) || (team2Key && country === team2Key);
+  };
+  const hasTeamMatch = players.some(teamMatches);
+  const playingMatchesTeam = playingXI.some((name) =>
+    players.some((p) => normalizeName(p.name) === name && teamMatches(p))
+  );
+  if (hasTeamMatch && !playingMatchesTeam) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
+  }
   const superSub = submission?.superSub || null;
+
+  if (
+    submission?.superSubApplied &&
+    Array.isArray(submission?.superSubEffectivePlayers) &&
+    submission.superSubEffectivePlayers.length
+  ) {
+    const idSet = new Set(submission.superSubEffectivePlayers.map((id) => String(id)));
+    const effectivePlayers = players.filter((p) => idSet.has(String(p._id)));
+    if (superSub && idSet.has(String(superSub._id)) && !effectivePlayers.some((p) => String(p._id) === String(superSub._id))) {
+      effectivePlayers.push(superSub);
+    }
+    const effectiveCap = submission?.superSubEffectiveCaptain || submission?.captain;
+    const effectiveVc = submission?.superSubEffectiveViceCaptain || submission?.viceCaptain;
+    const effectiveCapNameStored = getPlayerNameById(effectivePlayers, effectiveCap);
+    const effectiveVcNameStored = getPlayerNameById(effectivePlayers, effectiveVc);
+    return {
+      nameSet: new Set(effectivePlayers.map((p) => normalizeName(p.name))),
+      roleByName: new Map(effectivePlayers.map((p) => [normalizeName(p.name), p.role])),
+      capName: effectiveCapNameStored || null,
+      vcName: effectiveVcNameStored || null,
+      superSubUsed: true,
+      superSubName: superSub?.name
+    };
+  }
+
   if (!superSub || !playingXI.length) {
     return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
   }
@@ -451,8 +491,8 @@ router.post("/", authRequired, async (req, res) => {
   }
 
   const totalPrice = players.reduce((sum, p) => sum + p.price, 0);
-  if (totalPrice > 90) {
-    return res.status(400).json({ error: "Budget exceeded (max 90)" });
+  if (totalPrice > 100) {
+    return res.status(400).json({ error: "Budget exceeded (max 100)" });
   }
 
   const roleCounts = players.reduce(

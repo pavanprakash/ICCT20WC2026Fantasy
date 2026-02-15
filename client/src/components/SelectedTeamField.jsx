@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import defaultPlayer from "../assets/default-player.svg";
+import { countryFlag } from "../utils/flags.js";
 
 const roleBuckets = (players = []) => {
   const buckets = {
@@ -36,27 +37,58 @@ const initials = (name = "") =>
 
 const formatPrice = (value) => Number(value || 0).toFixed(1);
 
-const teamCode = (value = "") =>
-  String(value || "")
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .slice(0, 3)
-    .toUpperCase();
-
-const PlayerChip = ({ player, isCaptain, isViceCaptain, canEdit, onRemove, pointsByName }) => {
+const PlayerChip = ({
+  player,
+  isCaptain,
+  isViceCaptain,
+  isCaptainX3,
+  canEdit,
+  onRemove,
+  pointsByName,
+  onSelect,
+  selectable
+}) => {
   const key = String(player.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const points = pointsByName?.get ? pointsByName.get(key) : null;
   return (
-  <div className="player-chip">
+  <div
+    className={`player-chip ${selectable ? "player-chip--selectable" : ""}`}
+    role={selectable ? "button" : undefined}
+    tabIndex={selectable ? 0 : undefined}
+    onClick={selectable ? () => onSelect?.(player) : undefined}
+    onKeyDown={
+      selectable
+        ? (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelect?.(player);
+            }
+          }
+        : undefined
+    }
+  >
     <div className="player-chip__avatar">
-      <img src={defaultPlayer} alt={player.name || "Player"} loading="lazy" />
-      <span className="player-chip__team">{teamCode(player.country || player.team)}</span>
+      <img
+        src={player.playerImg || defaultPlayer}
+        alt={player.name || "Player"}
+        loading="lazy"
+      />
     </div>
+    {isCaptainX3 && <span className="badge badge--captainx3">C x3</span>}
     {(isCaptain || isViceCaptain) && (
       <span className={`badge ${isCaptain ? "badge--captain" : "badge--vc"}`}>
         {isCaptain ? "C" : "V/C"}
       </span>
     )}
     <div className="player-chip__name">{player.name}</div>
+    {(() => {
+      const flag = countryFlag(player.country || player.team);
+      return (
+        <div className="player-chip__flag">
+          {flag.type === "img" ? <img src={flag.value} alt={`${player.country || "Country"} flag`} /> : flag.value}
+        </div>
+      );
+    })()}
     <div className="player-chip__price">£{formatPrice(player.price)}m</div>
     {points != null ? <div className="player-chip__points">Pts {points}</div> : null}
     {canEdit && (
@@ -78,6 +110,9 @@ export default function SelectedTeamField({
   players = [],
   captainId = "",
   viceCaptainId = "",
+  captainX3PlayerId = "",
+  showCaptainX3Prompt = false,
+  onCaptainX3Pick,
   canEdit = false,
   onRemove,
   pointsByName
@@ -86,6 +121,12 @@ export default function SelectedTeamField({
 
   return (
     <section className="team-field">
+      {showCaptainX3Prompt && (
+        <div className="team-field__prompt" aria-live="polite">
+          <span className="team-field__prompt-icon">🖱️</span>
+          <span>Pick CAPTAIN X3 from your XI</span>
+        </div>
+      )}
       <div className="field-section">
         <div className="field-section__title">WICKET-KEEPERS</div>
         <div className="field-section__grid field-section__grid--wk">
@@ -96,6 +137,9 @@ export default function SelectedTeamField({
                 player={player}
                 isCaptain={String(player._id) === String(captainId)}
                 isViceCaptain={String(player._id) === String(viceCaptainId)}
+                isCaptainX3={String(player._id) === String(captainX3PlayerId)}
+                selectable={Boolean(showCaptainX3Prompt)}
+                onSelect={onCaptainX3Pick}
                 canEdit={canEdit}
                 onRemove={onRemove}
                 pointsByName={pointsByName}
@@ -117,6 +161,9 @@ export default function SelectedTeamField({
                 player={player}
                 isCaptain={String(player._id) === String(captainId)}
                 isViceCaptain={String(player._id) === String(viceCaptainId)}
+                isCaptainX3={String(player._id) === String(captainX3PlayerId)}
+                selectable={Boolean(showCaptainX3Prompt)}
+                onSelect={onCaptainX3Pick}
                 canEdit={canEdit}
                 onRemove={onRemove}
                 pointsByName={pointsByName}
@@ -138,6 +185,9 @@ export default function SelectedTeamField({
                 player={player}
                 isCaptain={String(player._id) === String(captainId)}
                 isViceCaptain={String(player._id) === String(viceCaptainId)}
+                isCaptainX3={String(player._id) === String(captainX3PlayerId)}
+                selectable={Boolean(showCaptainX3Prompt)}
+                onSelect={onCaptainX3Pick}
                 canEdit={canEdit}
                 onRemove={onRemove}
                 pointsByName={pointsByName}
@@ -159,6 +209,9 @@ export default function SelectedTeamField({
                 player={player}
                 isCaptain={String(player._id) === String(captainId)}
                 isViceCaptain={String(player._id) === String(viceCaptainId)}
+                isCaptainX3={String(player._id) === String(captainX3PlayerId)}
+                selectable={Boolean(showCaptainX3Prompt)}
+                onSelect={onCaptainX3Pick}
                 canEdit={canEdit}
                 onRemove={onRemove}
                 pointsByName={pointsByName}

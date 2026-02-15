@@ -66,7 +66,7 @@ const RULES = [
     items: [
       { label: "Captain Points", value: "2x" },
       { label: "Vice-Captain Points", value: "1.5x" },
-      { label: "In Announced Lineups", value: "+4 pts" },
+      { label: "Playing XI Appearance", value: "+4 pts" },
       { label: "Playing Substitute", value: "+4 pts" }
     ]
   },

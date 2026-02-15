@@ -11,6 +11,7 @@ import fantasyRoutes from "./routes/fantasy.js";
 import fixturesRoutes from "./routes/fixtures.js";
 import cron from "node-cron";
 import { updateAllLeaguesDaily } from "./jobs/dailyLeagueUpdate.js";
+import { autoSubmitMissingTeams } from "./jobs/autoSubmitTeams.js";
 
 dotenv.config();
 
@@ -52,15 +53,34 @@ mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log("MongoDB connected");
-    // Run daily sync at 19:00 UTC (7pm GMT)
+    // Run daily sync twice at 13:00 and 18:00 UTC (1pm & 6pm GMT)
+    ["0 13 * * *", "0 18 * * *"].forEach((schedule) => {
+      cron.schedule(
+        schedule,
+        async () => {
+          try {
+            const autoResult = await autoSubmitMissingTeams();
+            console.log("Auto submissions completed", autoResult);
+            const result = await updateAllLeaguesDaily();
+            console.log("Daily league update completed", result);
+          } catch (err) {
+            console.error("Daily league update failed:", err.message);
+          }
+        },
+        { timezone: "UTC" }
+      );
+    });
+    // Auto-submit missing teams every 10 minutes after matches start.
     cron.schedule(
-      "0 19 * * *",
+      "*/10 * * * *",
       async () => {
         try {
-          const result = await updateAllLeaguesDaily();
-          console.log("Daily league update completed", result);
+          const autoResult = await autoSubmitMissingTeams();
+          if (autoResult.autoSubmissions || autoResult.matchesChecked) {
+            console.log("Auto submissions completed", autoResult);
+          }
         } catch (err) {
-          console.error("Daily league update failed:", err.message);
+          console.error("Auto submissions failed:", err.message);
         }
       },
       { timezone: "UTC" }

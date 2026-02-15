@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../api.js";
+import { countryFlag } from "../utils/flags.js";
 
 const MATCH_DURATION_MS = 4 * 60 * 60 * 1000;
 const SYNC_WINDOW_MS = 10 * 60 * 1000;
@@ -153,7 +154,14 @@ export default function Players() {
               <h4>{player.name}</h4>
               <span className="pill">{player.role}</span>
             </div>
-            <div className="muted">{player.country}</div>
+            {(() => {
+              const flag = countryFlag(player.country);
+              return (
+                <div className="player-flag">
+                  {flag.type === "img" ? <img src={flag.value} alt={`${player.country} flag`} /> : flag.value}
+                </div>
+              );
+            })()}
             <div className="stats">
               <div>Runs: {player.stats.runs}</div>
               <div>Wickets: {player.stats.wickets}</div>
