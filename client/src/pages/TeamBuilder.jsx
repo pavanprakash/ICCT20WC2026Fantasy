@@ -71,6 +71,7 @@ const roleKey = (player) => {
 
 export default function TeamBuilder() {
   const statusRef = React.useRef(null);
+  const selectedXiRef = React.useRef(null);
   const [players, setPlayers] = useState([]);
   const [selected, setSelected] = useState([]);
   const [teamName, setTeamName] = useState("My XI");
@@ -309,6 +310,21 @@ export default function TeamBuilder() {
     setFixtureDay(matches);
     setFixtureStatus(matches.length ? "ok" : "empty");
   }, [fixtureDateFilter, fixturesAll]);
+
+  const todayDateKey = useMemo(() => todayUtc(), []);
+  const tomorrowDateKey = useMemo(() => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+  const fixturesToday = useMemo(
+    () => (fixturesAll || []).filter((m) => m.date === todayDateKey),
+    [fixturesAll, todayDateKey]
+  );
+  const fixturesTomorrow = useMemo(
+    () => (fixturesAll || []).filter((m) => m.date === tomorrowDateKey),
+    [fixturesAll, tomorrowDateKey]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -609,7 +625,11 @@ export default function TeamBuilder() {
         return;
       }
       if (!hasCaptains) {
-        focusStatus("Select a captain and a vice-captain.");
+        focusStatus(
+          captainId && viceCaptainId && String(captainId) === String(viceCaptainId)
+            ? "Captain and vice-captain must be different."
+            : "Select a captain and a vice-captain."
+        );
         return;
       }
       const usedBoosters = teamMeta?.usedBoosters || [];
@@ -902,6 +922,12 @@ export default function TeamBuilder() {
     setSuperSubId(teamMeta?.superSub ? String(teamMeta.superSub) : "");
   }, [isEditing, teamMeta?.boosterPlayer, teamMeta?.superSub]);
 
+  useEffect(() => {
+    if (boosterSelected !== "captainx3" || boosterPlayerId) return;
+    if (!selectedXiRef.current) return;
+    selectedXiRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [boosterSelected, boosterPlayerId]);
+
   const handleRemove = (id) => {
     if (teamMeta && !isEditing) {
       setStatus("Click Update Team to make changes.");
@@ -1040,7 +1066,10 @@ export default function TeamBuilder() {
                   <option
                     key={`cap-${player._id}`}
                     value={player._id}
-                    disabled={boosterSelected === "captainx3" && String(boosterPlayerId) === String(player._id)}
+                    disabled={
+                      (boosterSelected === "captainx3" && String(boosterPlayerId) === String(player._id)) ||
+                      String(viceCaptainId) === String(player._id)
+                    }
                   >
                     {player.name}
                   </option>
@@ -1060,7 +1089,10 @@ export default function TeamBuilder() {
                   <option
                     key={`vc-${player._id}`}
                     value={player._id}
-                    disabled={boosterSelected === "captainx3" && String(boosterPlayerId) === String(player._id)}
+                    disabled={
+                      (boosterSelected === "captainx3" && String(boosterPlayerId) === String(player._id)) ||
+                      String(captainId) === String(player._id)
+                    }
                   >
                     {player.name}
                   </option>
@@ -1087,40 +1119,44 @@ export default function TeamBuilder() {
           </div>
           <div className="panel-block panel-block--fixtures">
             <div className="panel-title">Upcoming Fixtures (GMT)</div>
-            {fixtureDates.length > 0 ? (
-              <div className="fixture-date-select">
-                <label className="label">Fixture date</label>
-                <select
-                  className="input"
-                  value={fixtureDateFilter}
-                  onChange={(e) => setFixtureDateFilter(e.target.value)}
-                >
-                  {fixtureDates.map((date) => (
-                    <option key={date} value={date}>{date}</option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-            {nextMatch?.date ? (
-              <div className="muted">Next match date: {nextMatch.date}</div>
-            ) : null}
             {fixtureStatus === "loading" && <div className="muted">Loading fixtures...</div>}
             {fixtureStatus === "error" && <div className="muted">Fixtures unavailable.</div>}
-            {fixtureStatus === "empty" && (
-              <div className="muted">
-                {targetDateKey ? `No fixtures for ${targetDateKey}.` : "No upcoming fixtures."}
-              </div>
-            )}
-            {fixtureStatus === "ok" && (
-              <div className="fixture-mini">
-                {fixtureDay.map((match, idx) => (
-                  <div key={match.id || idx} className="fixture-mini__item">
-                    <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
-                    <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
-                    <div className="muted">{match.venue}</div>
-                    <div className="muted">{match.statusLabel || match.status}</div>
-                  </div>
-                ))}
+            {fixtureStatus !== "loading" && fixtureStatus !== "error" && (
+              <div className="fixture-columns">
+                <div className="fixture-column">
+                  <div className="fixture-column__header">{todayDateKey}</div>
+                  {fixturesToday.length ? (
+                    <div className="fixture-mini">
+                      {fixturesToday.map((match, idx) => (
+                        <div key={match.id || idx} className="fixture-mini__item">
+                          <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
+                          <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
+                          <div className="muted">{match.venue}</div>
+                          <div className="muted">{match.statusLabel || match.status}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="muted">No fixtures for {todayDateKey}.</div>
+                  )}
+                </div>
+                <div className="fixture-column">
+                  <div className="fixture-column__header">{tomorrowDateKey}</div>
+                  {fixturesTomorrow.length ? (
+                    <div className="fixture-mini">
+                      {fixturesTomorrow.map((match, idx) => (
+                        <div key={match.id || idx} className="fixture-mini__item">
+                          <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
+                          <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
+                          <div className="muted">{match.venue}</div>
+                          <div className="muted">{match.statusLabel || match.status}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="muted">No fixtures for {tomorrowDateKey}.</div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1352,16 +1388,18 @@ export default function TeamBuilder() {
           </div>
           <div className="panel-block">
             <div className="panel-title">Selected XI</div>
-            <SelectedTeamField
-              players={selectedPlayers}
-              captainId={captainId}
-              viceCaptainId={viceCaptainId}
-              captainX3PlayerId={boosterPlayerId}
-              showCaptainX3Prompt={boosterSelected === "captainx3" && !boosterPlayerId}
-              onCaptainX3Pick={handleCaptainX3Pick}
-              canEdit={!teamMeta || isEditing}
-              onRemove={handleRemove}
-            />
+            <div ref={selectedXiRef} className="selected-xi-anchor">
+              <SelectedTeamField
+                players={selectedPlayers}
+                captainId={captainId}
+                viceCaptainId={viceCaptainId}
+                captainX3PlayerId={boosterPlayerId}
+                showCaptainX3Prompt={boosterSelected === "captainx3" && !boosterPlayerId}
+                onCaptainX3Pick={handleCaptainX3Pick}
+                canEdit={!teamMeta || isEditing}
+                onRemove={handleRemove}
+              />
+            </div>
           </div>
           <div className="filters">
             <div className="filter-group">

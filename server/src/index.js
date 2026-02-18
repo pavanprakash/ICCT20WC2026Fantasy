@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import mongoose from "mongoose";
 import authRoutes from "./routes/auth.js";
 import playerRoutes from "./routes/players.js";
@@ -12,8 +14,23 @@ import fixturesRoutes from "./routes/fixtures.js";
 import cron from "node-cron";
 import { updateAllLeaguesDaily } from "./jobs/dailyLeagueUpdate.js";
 import { autoSubmitMissingTeams } from "./jobs/autoSubmitTeams.js";
+import { scheduledMatchSyncs } from "./jobs/scheduledMatchSyncs.js";
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const envCandidates = [
+  process.env.DOTENV_PATH,
+  path.resolve(process.cwd(), ".env"),
+  path.resolve(process.cwd(), "server/.env"),
+  path.resolve(__dirname, "../.env")
+].filter(Boolean);
+
+for (const envPath of envCandidates) {
+  dotenv.config({ path: envPath });
+  if (process.env.CRICAPI_KEY || process.env.CRICAPI_SERIES_KEY) {
+    console.log(`Loaded env from ${envPath}`);
+    break;
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -81,6 +98,22 @@ mongoose
           }
         } catch (err) {
           console.error("Auto submissions failed:", err.message);
+        }
+      },
+      { timezone: "UTC" }
+    );
+
+    // Sync match points 15 and 45 minutes after scheduled end time.
+    cron.schedule(
+      "*/5 * * * *",
+      async () => {
+        try {
+          const result = await scheduledMatchSyncs();
+          if (result.attempted) {
+            console.log("Scheduled match syncs completed", result);
+          }
+        } catch (err) {
+          console.error("Scheduled match syncs failed:", err.message);
         }
       },
       { timezone: "UTC" }

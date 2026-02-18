@@ -15,7 +15,9 @@ const COUNTRY_TO_FLAG = {
   "new zealand": "NZ",
   "oman": "OM",
   "pakistan": "PK",
-  "scotland": "GB",
+  "scotland": "IMG:SCOT",
+  "sco": "IMG:SCOT",
+  "scot": "IMG:SCOT",
   "south africa": "ZA",
   "sri lanka": "LK",
   "united arab emirates": "AE",
@@ -27,7 +29,10 @@ const COUNTRY_TO_FLAG = {
 };
 
 const COUNTRY_TO_IMAGE = {
-  "west indies": westIndiesFlag
+  "west indies": westIndiesFlag,
+  "scotland": "https://g.cricapi.com/iapi/79-637877081763746652.webp?w=48",
+  "sco": "https://g.cricapi.com/iapi/79-637877081763746652.webp?w=48",
+  "scot": "https://g.cricapi.com/iapi/79-637877081763746652.webp?w=48"
 };
 
 const toFlagEmoji = (code) =>

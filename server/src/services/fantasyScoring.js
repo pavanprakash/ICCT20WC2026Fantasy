@@ -173,15 +173,19 @@ function bowlingPoints(entry, rules) {
 
 function fieldingPoints(entry, rules) {
   const catches = toNumber(entry.catches ?? entry.catch);
-  const stumpings = toNumber(entry.stumpings ?? entry.stumping);
+  const stumpings = toNumber(entry.stumpings ?? entry.stumping ?? entry.stumped);
   const runoutDirect = toNumber(entry.runoutDirect ?? entry.runout_direct);
-  const runoutIndirect = toNumber(entry.runoutIndirect ?? entry.runout_indirect);
+  let runoutIndirect = toNumber(entry.runoutIndirect ?? entry.runout_indirect);
+  const runout = toNumber(entry.runout ?? entry.runOut);
 
   let points = 0;
   points += catches * rules.fielding.catch;
   if (catches >= 3) points += rules.fielding.threeCatchBonus;
   points += stumpings * rules.fielding.stumping;
   points += runoutDirect * rules.fielding.runoutDirect;
+  if (!runoutIndirect && runout && !runoutDirect) {
+    runoutIndirect = runout;
+  }
   points += runoutIndirect * rules.fielding.runoutIndirect;
 
   return { points, catches, stumpings, runoutDirect, runoutIndirect };

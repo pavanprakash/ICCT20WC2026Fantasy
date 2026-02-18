@@ -498,6 +498,23 @@ main {
 .team-field__prompt-icon {
   font-size: 14px;
   line-height: 1;
+  animation: nudgeMouse 1.2s ease-in-out infinite;
+}
+
+.selected-xi-anchor {
+  scroll-margin-top: 90px;
+}
+
+@keyframes nudgeMouse {
+  0% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-4px);
+  }
+  100% {
+    transform: translateY(0);
+  }
 }
 
 .field-section {
@@ -515,23 +532,10 @@ main {
 }
 
 .field-section__grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 22px;
-  justify-content: center;
-}
-
-.field-section__grid--wk {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-.field-section__grid--bat {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-
-.field-section__grid--ar,
-.field-section__grid--bowl {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  justify-items: center;
 }
 
 .field-section__empty {
@@ -543,9 +547,9 @@ main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px 10px;
-  min-width: 120px;
+  gap: 5px;
+  padding: 2px 4px 8px;
+  min-width: 0;
   border-radius: 16px;
   background: transparent;
   border: none;
@@ -562,8 +566,8 @@ main {
 }
 
 .player-chip__avatar {
-  width: 72px;
-  height: 88px;
+  width: 56px;
+  height: 68px;
   border-radius: 18px 18px 36px 36px;
   display: grid;
   place-items: center;
@@ -640,20 +644,20 @@ main {
 
 .player-chip__name {
   font-weight: 700;
-  font-size: 12px;
+  font-size: 11px;
   background: #1f2937;
   color: #fff;
-  padding: 4px 12px;
+  padding: 3px 8px;
   border-radius: 999px;
   text-align: center;
-  max-width: 140px;
+  max-width: 120px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .player-chip__price {
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.9);
 }
 
@@ -673,7 +677,7 @@ main {
 .player-chip__points {
   font-weight: 700;
   color: #c6ffe3;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .chip-remove {
@@ -730,6 +734,10 @@ main {
 .card--select .muted,
 .card--player .card__footer,
 .card--select .card__footer {
+  color: #000000;
+}
+
+.card--player .points {
   color: #000000;
 }
 
@@ -1097,6 +1105,46 @@ main {
 .fixture-mini {
   display: grid;
   gap: 10px;
+  width: 100%;
+}
+
+.fixture-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.fixture-column {
+  display: grid;
+  gap: 8px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.fixture-column__header {
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .fixture-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .fixture-mini__item {
+    padding: 6px 8px;
+  }
+  .fixture-mini__time {
+    font-size: 12px;
+  }
+  .fixture-mini__teams {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
 }
 
 .fixture-mini__item {
@@ -1104,6 +1152,8 @@ main {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .fixture-mini__time {
@@ -1564,7 +1614,91 @@ main {
   }
 
   .grid--players {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: 120px;
+    max-height: calc(4 * 120px + 3 * 20px);
+  }
+
+  .grid--players .card {
+    padding: 8px 6px;
+    gap: 6px;
+  }
+
+  .grid--players .card__top {
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .grid--players .card__top h4 {
+    font-size: 11px;
+    line-height: 1.1;
+    text-align: center;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .grid--players .pill {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+
+  .grid--players .player-flag {
+    font-size: 20px;
+  }
+
+  .grid--players .player-flag img {
+    width: 20px;
+    height: 20px;
+  }
+
+  .grid--players .stats {
+    font-size: 9px;
+    line-height: 1.2;
+    display: grid;
+    gap: 2px;
+    text-align: center;
+  }
+
+  .grid--players .card__footer {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 9px;
+  }
+
+  .field-section__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .player-chip {
+    padding: 2px 2px 6px;
+  }
+
+  .player-chip__avatar {
+    width: 48px;
+    height: 60px;
+    border-radius: 16px 16px 30px 30px;
+  }
+
+  .player-chip__name {
+    font-size: 10px;
+    max-width: 90px;
+    padding: 2px 6px;
+  }
+
+  .player-chip__price {
+    font-size: 10px;
+  }
+
+  .badge {
+    top: 44px;
+    right: 4px;
+    font-size: 9px;
   }
 
   .card__top {

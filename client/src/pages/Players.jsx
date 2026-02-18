@@ -169,7 +169,9 @@ export default function Players() {
             </div>
             <div className="card__footer">
               <span className="price">Price: £{formatPrice(player.price)}m</span>
-              <span className="points">Points: {player.points}</span>
+              <span className="points">
+                Points: {Number.isFinite(player.points) ? player.points : 0}
+              </span>
             </div>
           </div>
         ))}
