@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import mongoose from "mongoose";
+import rateLimit from "express-rate-limit";
 import authRoutes from "./routes/auth.js";
 import playerRoutes from "./routes/players.js";
 import teamRoutes from "./routes/teams.js";
@@ -35,6 +36,8 @@ for (const envPath of envCandidates) {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.set("trust proxy", 1);
+
 const allowlist = (process.env.CLIENT_ORIGIN || "")
   .split(",")
   .map((o) => o.trim())
@@ -54,10 +57,22 @@ app.use(
 );
 app.use(express.json());
 
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.get("/", (req, res) => {
+  res.status(200).send("ICC Fantasy API is running");
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "ICC Fantasy API running" });
 });
 
+app.use("/api", apiLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/players", playerRoutes);
 app.use("/api/teams", teamRoutes);
