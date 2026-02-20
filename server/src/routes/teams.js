@@ -236,10 +236,12 @@ function diffTransfers(oldIds, newIds) {
 }
 
 const GROUP_LIMIT = 120;
-const SUPER8_LIMIT = 60;
+const SUPER8_LIMIT = 50;
 const LOCK_BEFORE_SECONDS = 5;
 const LOCK_AFTER_MINUTES = 5;
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
+const FIRST_SUPER8_DATE = "2026-02-21";
+const FIRST_SUPER8_START_MS = Date.UTC(2026, 1, 21, 13, 30, 0, 0);
 const ROLE_LIMITS = {
   bat: 5,
   bowl: 5,
@@ -373,6 +375,17 @@ function getTransferPhase() {
   return today > lastGroup ? "SUPER8" : "GROUP";
 }
 
+function getCurrentTransferState(nextMatchDate = null) {
+  const phase = getTransferPhase();
+  const now = Date.now();
+  const inferredSuper8 = (nextMatchDate && String(nextMatchDate) >= FIRST_SUPER8_DATE) || phase === "SUPER8";
+  if (inferredSuper8 && now < FIRST_SUPER8_START_MS) {
+    return "SUPER8_PRE";
+  }
+  if (inferredSuper8) return "SUPER8";
+  return phase;
+}
+
 router.get("/leaderboard", async (req, res) => {
   const teams = await Team.find()
     .populate("user", "name email")
@@ -397,7 +410,40 @@ router.get("/me", authRequired, async (req, res) => {
   const team = await Team.findOne({ user: req.user.id }).populate("players").lean();
   if (!team) return res.json(null);
 
-  const phase = team.transferPhase || getTransferPhase();
+  const phase =
+    team.transferPhase === "SUPER8_PRE" && Date.now() < FIRST_SUPER8_START_MS
+      ? "SUPER8_PRE"
+      : getCurrentTransferState(team.submittedForDate || null);
+  const needsSuper8Reset =
+    (phase === "SUPER8_PRE" || phase === "SUPER8") &&
+    !team.postGroupResetDone;
+
+  let transfersLimit = team.transfersLimit ?? (phase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT);
+  let transfersUsedTotal = team.transfersUsedTotal ?? 0;
+  let transfersByRound = team.transfersByRound || {};
+  let transferPhase = phase;
+  let postGroupResetDone = team.postGroupResetDone || false;
+
+  // Backfill existing users lazily when they load team data in Super 8 window.
+  if (needsSuper8Reset) {
+    transfersLimit = SUPER8_LIMIT;
+    transfersUsedTotal = 0;
+    transfersByRound = {};
+    transferPhase = phase;
+    postGroupResetDone = true;
+    await Team.updateOne(
+      { _id: team._id },
+      {
+        $set: {
+          transfersLimit,
+          transfersUsedTotal,
+          transfersByRound,
+          transferPhase,
+          postGroupResetDone
+        }
+      }
+    );
+  }
 
   res.json({
     id: team._id,
@@ -405,11 +451,11 @@ router.get("/me", authRequired, async (req, res) => {
     players: team.players,
     points: teamPoints(team.players || []),
     lockedInLeague: team.lockedInLeague || false,
-    transfersLimit: team.transfersLimit ?? (phase === "SUPER8" ? SUPER8_LIMIT : GROUP_LIMIT),
-    transfersUsedTotal: team.transfersUsedTotal ?? 0,
-    transfersByRound: team.transfersByRound || {},
-    transferPhase: phase,
-    postGroupResetDone: team.postGroupResetDone || false,
+    transfersLimit,
+    transfersUsedTotal,
+    transfersByRound,
+    transferPhase,
+    postGroupResetDone,
     boosterUsed: team.boosterUsed || false,
     boosterType: team.boosterType || null,
     usedBoosters: team.usedBoosters || [],
@@ -524,7 +570,6 @@ router.post("/", authRequired, async (req, res) => {
   }
 
   const existing = await Team.findOne({ user: req.user.id });
-  const phase = getTransferPhase();
   const today = new Date().toISOString().slice(0, 10);
   const matches = await getSeriesMatches();
   const window = getSubmissionWindow(matches);
@@ -552,6 +597,7 @@ router.post("/", authRequired, async (req, res) => {
   const earliestStartMs = window.nextMatch?.startMs
     ? Number(window.nextMatch.startMs)
     : null;
+  const phase = getCurrentTransferState(window.nextMatch?.date || null);
   const firstMatchStartMs = existing?.firstSubmittedMatchStart
     ? new Date(existing.firstSubmittedMatchStart).getTime()
     : (existing?.submittedForMatchStart ? new Date(existing.submittedForMatchStart).getTime() : null);
@@ -600,14 +646,21 @@ router.post("/", authRequired, async (req, res) => {
     if (existing.lockedInLeague) {
       if (inFirstSubmissionWindow) {
         // Free changes before the first submitted match starts; no transfers counted.
-      } else if (phase === "SUPER8" && !existing.postGroupResetDone) {
-        // One-time post-group reset: unlimited transfers before Super 8 cap applies
+      } else if (phase === "SUPER8_PRE") {
+        // Unlimited transfers before first Super 8 fixture starts.
+        if (!existing.postGroupResetDone) {
+          existing.transfersUsedTotal = 0;
+          existing.transfersByRound = {};
+          existing.postGroupResetDone = true;
+        }
         existing.transfersLimit = SUPER8_LIMIT;
-        existing.transfersUsedTotal = 0;
-        existing.transfersByRound = {};
-        existing.postGroupResetDone = true;
-        existing.transferPhase = "SUPER8";
+        existing.transferPhase = "SUPER8_PRE";
       } else {
+        if (phase === "SUPER8" && !existing.postGroupResetDone) {
+          existing.transfersUsedTotal = 0;
+          existing.transfersByRound = {};
+          existing.postGroupResetDone = true;
+        }
         const limit = phase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT;
         existing.transfersLimit = limit;
         existing.transferPhase = phase;
@@ -616,7 +669,7 @@ router.post("/", authRequired, async (req, res) => {
         const used = existing.transfersUsedTotal ?? 0;
         if (used + transfersThisAction > limit) {
           return res.status(400).json({
-            error: `Transfer limit reached. Remaining: ${Math.max(0, limit - used)}`
+            error: "You have maxed out the number of allowed transfers for this round!"
           });
         }
         const key = roundKey();
@@ -718,7 +771,7 @@ router.post("/", authRequired, async (req, res) => {
     transfersUsedTotal: 0,
     transfersByRound: {},
     transferPhase,
-    postGroupResetDone: transferPhase === "SUPER8",
+    postGroupResetDone: transferPhase === "SUPER8" || transferPhase === "SUPER8_PRE",
     boosterUsed: Boolean(boosterType),
     boosterType: boosterType || null,
     usedBoosters: boosterType ? [boosterType] : [],

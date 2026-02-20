@@ -76,7 +76,8 @@ const RULES = [
       { label: "Free changes before your first match starts", value: "" },
       { label: "Transfers count after your first submitted match begins", value: "" },
       { label: "Group stage transfer limit", value: "120" },
-      { label: "Finals transfer limit", value: "45" },
+      { label: "Unlimited transfers before first Super 8 fixture starts", value: "" },
+      { label: "Super 8 transfer limit", value: "50" },
       { label: "Transfers are locked 5 seconds before match start until 5 minutes after", value: "" }
     ]
   },

@@ -1130,6 +1130,23 @@ main {
   text-align: center;
 }
 
+@media (min-width: 769px) {
+  .fixture-columns {
+    padding: 0;
+    gap: 12px;
+  }
+
+  .fixture-column {
+    padding: 0;
+  }
+
+  .fixture-column__header {
+    text-align: left;
+    margin-bottom: 6px;
+    padding-left: 2px;
+  }
+}
+
 @media (max-width: 768px) {
   .fixture-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1142,8 +1159,14 @@ main {
     font-size: 12px;
   }
   .fixture-mini__teams {
-    font-size: 12px;
+    font-size: 16px;
+    font-weight: 600;
     margin-bottom: 4px;
+  }
+
+  .fixture-mini__item .muted {
+    font-size: 11px;
+    line-height: 1.25;
   }
 }
 

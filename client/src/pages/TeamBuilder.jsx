@@ -29,6 +29,7 @@ const MATCH_DURATION_MS = 4 * 60 * 60 * 1000;
 const SYNC_WINDOW_MS = 10 * 60 * 1000;
 const LOCK_BEFORE_MS = 5 * 1000;
 const LOCK_AFTER_MS = 5 * 60 * 1000;
+const FIRST_SUPER8_START_MS = Date.UTC(2026, 1, 21, 13, 30, 0, 0);
 const formatPrice = (value) => Number(value || 0).toFixed(1);
 const todayUtc = () => {
   const now = new Date();
@@ -49,6 +50,44 @@ const parseMatchStart = (match) => {
   const start = new Date(`${match.date}T${match.timeGMT}:00Z`).getTime();
   if (!Number.isFinite(start)) return null;
   return { ...match, startMs: start };
+};
+
+const fixtureKey = (match) => `${match?.date || ""}|${match?.timeGMT || match?.time || ""}`;
+
+const mergeFixturesWithLocal = (apiMatches = []) => {
+  const localByKey = new Map(
+    fixtures.map((m) => [fixtureKey(m), { ...m, timeGMT: m.timeGMT || m.time || null }])
+  );
+  const merged = [];
+  const seen = new Set();
+
+  for (const apiMatch of apiMatches) {
+    const key = fixtureKey(apiMatch);
+    const local = localByKey.get(key);
+    if (local) {
+      merged.push({
+        ...apiMatch,
+        team1: local.team1 || apiMatch.team1,
+        team2: local.team2 || apiMatch.team2,
+        venue: local.venue || apiMatch.venue,
+        stage: local.stage || apiMatch.stage,
+        date: local.date || apiMatch.date,
+        timeGMT: local.timeGMT || apiMatch.timeGMT || apiMatch.time || null
+      });
+      seen.add(key);
+    } else {
+      merged.push(apiMatch);
+    }
+  }
+
+  for (const local of fixtures) {
+    const key = fixtureKey(local);
+    if (!seen.has(key)) {
+      merged.push({ ...local, timeGMT: local.timeGMT || local.time || null, statusLabel: "Scheduled" });
+    }
+  }
+
+  return merged.sort((a, b) => `${a.date || ""}${a.timeGMT || ""}`.localeCompare(`${b.date || ""}${b.timeGMT || ""}`));
 };
 
 const computeMatchWindow = (matches) => {
@@ -177,7 +216,7 @@ export default function TeamBuilder() {
     api.get("/fixtures")
       .then((res) => {
         if (!mounted) return;
-        const matches = res.data?.matches || [];
+        const matches = mergeFixturesWithLocal(res.data?.matches || []);
         const todayKey = todayUtc();
         const { lockMatch, nextMatch: upcoming } = computeMatchWindow(matches);
         if (!matches.length) {
@@ -311,19 +350,15 @@ export default function TeamBuilder() {
     setFixtureStatus(matches.length ? "ok" : "empty");
   }, [fixtureDateFilter, fixturesAll]);
 
-  const todayDateKey = useMemo(() => todayUtc(), []);
-  const tomorrowDateKey = useMemo(() => {
-    const d = new Date();
-    d.setUTCDate(d.getUTCDate() + 1);
-    return d.toISOString().slice(0, 10);
-  }, []);
+  const todayDateKey = "2026-02-21";
+  const tomorrowDateKey = "2026-02-22";
   const fixturesToday = useMemo(
-    () => (fixturesAll || []).filter((m) => m.date === todayDateKey),
-    [fixturesAll, todayDateKey]
+    () => fixtures.filter((m) => m.date === todayDateKey),
+    [todayDateKey]
   );
   const fixturesTomorrow = useMemo(
-    () => (fixturesAll || []).filter((m) => m.date === tomorrowDateKey),
-    [fixturesAll, tomorrowDateKey]
+    () => fixtures.filter((m) => m.date === tomorrowDateKey),
+    [tomorrowDateKey]
   );
 
   useEffect(() => {
@@ -445,6 +480,7 @@ export default function TeamBuilder() {
   const totalPoints = periodPoints.total;
 
   const transfersUsedThisRound = useMemo(() => {
+    if (Date.now() < FIRST_SUPER8_START_MS) return 0;
     if (!teamMeta) return 0;
     const key = roundKey();
     const map = teamMeta.transfersByRound || {};
@@ -455,6 +491,7 @@ export default function TeamBuilder() {
   }, [teamMeta]);
 
   const transfersRemaining = useMemo(() => {
+    if (Date.now() < FIRST_SUPER8_START_MS) return null;
     if (!teamMeta) return null;
     const limit = teamMeta.transfersLimit ?? 120;
     const used = teamMeta.transfersUsedTotal ?? 0;
@@ -462,12 +499,25 @@ export default function TeamBuilder() {
   }, [teamMeta]);
 
   const transfersByRoundList = useMemo(() => {
+    if (Date.now() < FIRST_SUPER8_START_MS) return [];
     if (!teamMeta?.transfersByRound) return [];
     const map = teamMeta.transfersByRound;
     const entries = map instanceof Map ? Array.from(map.entries()) : Object.entries(map);
     return entries
       .map(([round, count]) => ({ round, count: Number(count) || 0 }))
       .sort((a, b) => (a.round > b.round ? 1 : -1));
+  }, [teamMeta]);
+
+  const transferPhaseLabel = useMemo(() => {
+    if (Date.now() < FIRST_SUPER8_START_MS) return "Super 8 (Pre-start)";
+    if (!teamMeta?.transferPhase) return "Group";
+    if (teamMeta.transferPhase === "SUPER8_PRE") return "Super 8 (Pre-start)";
+    if (teamMeta.transferPhase === "SUPER8") return "Super 8";
+    return "Group";
+  }, [teamMeta?.transferPhase]);
+
+  const showSuper8PreNotice = useMemo(() => {
+    return Date.now() < FIRST_SUPER8_START_MS;
   }, [teamMeta]);
 
   const teamCounts = useMemo(() => {
@@ -1019,30 +1069,41 @@ export default function TeamBuilder() {
           {firstSubmitFreeWindow && !teamMeta?.submittedForMatchStart ? (
             <div className="notice">Free changes until your first match starts.</div>
           ) : null}
+          {showSuper8PreNotice ? (
+            <div className="notice">You are allowed to make unlimited transfers before the start of first Super 8 fixture.</div>
+          ) : null}
           {teamMeta?.lockedInLeague ? (
             <div className="transfer-summary transfer-summary--team">
-              <div>Transfers this round: <strong>{transfersUsedThisRound}</strong></div>
-              <div>Transfers used: <strong>{teamMeta.transfersUsedTotal ?? 0}</strong></div>
-              <div>Transfers remaining: <strong>{transfersRemaining ?? 0}</strong> / {teamMeta.transfersLimit ?? 120}</div>
-              <div className="muted">Transfer phase: {teamMeta.transferPhase === "FINAL" ? "Finals" : "Group"}</div>
-              {teamMeta.transferPhase === "FINAL" && !teamMeta.postGroupResetDone ? (
-                <div className="muted">Post-group reset available (unlimited). Your next update won't count.</div>
+              <div>Transfers this round: <strong>{showSuper8PreNotice ? "Unlimited" : transfersUsedThisRound}</strong></div>
+              {!showSuper8PreNotice ? (
+                <div>Transfers used: <strong>{teamMeta.transfersUsedTotal ?? 0}</strong></div>
               ) : null}
-              <div className="transfer-rounds">
-                <div className="muted">Transfers by round</div>
-                {transfersByRoundList.length === 0 ? (
-                  <div className="muted">No transfers used yet.</div>
-                ) : (
-                  <div className="transfer-rounds__list">
-                    {transfersByRoundList.map((entry) => (
-                      <div key={entry.round} className="transfer-rounds__item">
-                        <span>{entry.round}</span>
-                        <strong>{entry.count}</strong>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {!showSuper8PreNotice ? (
+                <div>Transfers remaining: <strong>{transfersRemaining ?? 0}</strong> / {teamMeta.transfersLimit ?? 120}</div>
+              ) : (
+                <div>Transfers remaining: <strong>Unlimited</strong> (Super 8 cap after start: 50)</div>
+              )}
+              <div className="muted">Transfer phase: {transferPhaseLabel}</div>
+              {showSuper8PreNotice ? (
+                <div className="muted">Unlimited transfers until the first Super 8 fixture starts.</div>
+              ) : null}
+              {!showSuper8PreNotice ? (
+                <div className="transfer-rounds">
+                  <div className="muted">Transfers by round</div>
+                  {transfersByRoundList.length === 0 ? (
+                    <div className="muted">No transfers used yet.</div>
+                  ) : (
+                    <div className="transfer-rounds__list">
+                      {transfersByRoundList.map((entry) => (
+                        <div key={entry.round} className="transfer-rounds__item">
+                          <span>{entry.round}</span>
+                          <strong>{entry.count}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="transfer-summary muted">Unlimited transfers until you submit a team into a league.</div>
@@ -1119,46 +1180,42 @@ export default function TeamBuilder() {
           </div>
           <div className="panel-block panel-block--fixtures">
             <div className="panel-title">Upcoming Fixtures (GMT)</div>
-            {fixtureStatus === "loading" && <div className="muted">Loading fixtures...</div>}
-            {fixtureStatus === "error" && <div className="muted">Fixtures unavailable.</div>}
-            {fixtureStatus !== "loading" && fixtureStatus !== "error" && (
-              <div className="fixture-columns">
-                <div className="fixture-column">
-                  <div className="fixture-column__header">{todayDateKey}</div>
-                  {fixturesToday.length ? (
-                    <div className="fixture-mini">
-                      {fixturesToday.map((match, idx) => (
-                        <div key={match.id || idx} className="fixture-mini__item">
-                          <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
-                          <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
-                          <div className="muted">{match.venue}</div>
-                          <div className="muted">{match.statusLabel || match.status}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="muted">No fixtures for {todayDateKey}.</div>
-                  )}
-                </div>
-                <div className="fixture-column">
-                  <div className="fixture-column__header">{tomorrowDateKey}</div>
-                  {fixturesTomorrow.length ? (
-                    <div className="fixture-mini">
-                      {fixturesTomorrow.map((match, idx) => (
-                        <div key={match.id || idx} className="fixture-mini__item">
-                          <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
-                          <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
-                          <div className="muted">{match.venue}</div>
-                          <div className="muted">{match.statusLabel || match.status}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="muted">No fixtures for {tomorrowDateKey}.</div>
-                  )}
-                </div>
+            <div className="fixture-columns">
+              <div className="fixture-column">
+                <div className="fixture-column__header">{todayDateKey}</div>
+                {fixturesToday.length ? (
+                  <div className="fixture-mini">
+                    {fixturesToday.map((match, idx) => (
+                      <div key={match.id || idx} className="fixture-mini__item">
+                        <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
+                        <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
+                        <div className="muted">{match.venue}</div>
+                        <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="muted">No fixtures for {todayDateKey}.</div>
+                )}
               </div>
-            )}
+              <div className="fixture-column">
+                <div className="fixture-column__header">{tomorrowDateKey}</div>
+                {fixturesTomorrow.length ? (
+                  <div className="fixture-mini">
+                    {fixturesTomorrow.map((match, idx) => (
+                      <div key={match.id || idx} className="fixture-mini__item">
+                        <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
+                        <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
+                        <div className="muted">{match.venue}</div>
+                        <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="muted">No fixtures for {tomorrowDateKey}.</div>
+                )}
+              </div>
+            </div>
           </div>
           <div className="muted formation-limits">
             Formation limits: min 3 batters, 3 bowlers, 1 wicket-keeper, 1 all-rounder. Max 5 batters, 5 bowlers, 4 wicket-keepers, 4 all-rounders.
