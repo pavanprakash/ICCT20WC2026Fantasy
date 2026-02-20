@@ -12,6 +12,14 @@ function normalizeName(value) {
     .trim();
 }
 
+function buildRoleMap(players = []) {
+  const out = new Map();
+  for (const p of players) {
+    out.set(normalizeName(p?.name), p?.role || "");
+  }
+  return out;
+}
+
 function matchDateFromMatch(match) {
   const dt = match?.dateTimeGMT || match?.dateTime;
   if (!dt) return null;
@@ -40,6 +48,8 @@ export async function syncMatchPoints(matchId, { scorecardKey } = {}) {
 
   await ensureRules();
   const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
+  const players = await Player.find({}).lean();
+  const roleByName = buildRoleMap(players);
 
   const matchInfo = await cricapiGet("/match_info", { id: matchId }, key);
   const matchData = matchInfo?.data || {};
@@ -55,9 +65,9 @@ export async function syncMatchPoints(matchId, { scorecardKey } = {}) {
     safe.data;
   const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
   const playingXI = getPlayingXI(scoreRoot);
-  const playingXIBonus = Number(rules?.additional?.playingXI ?? 2);
+  const playingXIBonus = Number(rules?.additional?.playingXI ?? DEFAULT_RULESET.additional.playingXI);
   const points = applyPlayingXIPoints(
-    calculateMatchPoints(scorecard, rules),
+    calculateMatchPoints(scorecard, rules, { playerRoleByName: roleByName }),
     playingXI,
     playingXIBonus
   );
@@ -83,7 +93,6 @@ export async function syncMatchPoints(matchId, { scorecardKey } = {}) {
     }
   }
 
-  const players = await Player.find({}).lean();
   const bulk = [];
   for (const player of players) {
     const keyName = normalizeName(player.name);

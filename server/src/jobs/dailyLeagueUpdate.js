@@ -190,7 +190,7 @@ async function syncFantasyPoints() {
     }
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
     const playingXI = getPlayingXI(scoreRoot);
-    const playingXIBonus = Number(rules?.additional?.playingXI ?? 2);
+    const playingXIBonus = Number(rules?.additional?.playingXI ?? DEFAULT_RULESET.additional.playingXI);
     const points = applyPlayingXIPoints(
       calculateMatchPoints(scorecard, rules),
       playingXI,

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import api from "../api.js";
 
 const getUser = () => {
@@ -13,12 +13,36 @@ const getUser = () => {
 
 export default function Profile() {
   const user = useMemo(() => getUser(), []);
+  const [myLeagues, setMyLeagues] = useState([]);
+  const [leaguesLoading, setLeaguesLoading] = useState(true);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState(null);
   const [isError, setIsError] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadLeagues = async () => {
+      try {
+        const res = await api.get("/leagues/mine");
+        if (!mounted) return;
+        const all = Array.isArray(res.data) ? res.data : [];
+        const owned = all.filter((l) => String(l.owner) === String(user?.id));
+        setMyLeagues(owned);
+      } catch {
+        if (!mounted) return;
+        setMyLeagues([]);
+      } finally {
+        if (mounted) setLeaguesLoading(false);
+      }
+    };
+    loadLeagues();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
 
   const validate = () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
@@ -135,6 +159,37 @@ export default function Profile() {
               {saving ? "Updating..." : "Update Password"}
             </button>
           </form>
+        </div>
+
+        <div className="auth__card">
+          <div className="auth__header">
+            <h3>My Leagues</h3>
+            <p>Leagues you created.</p>
+          </div>
+          <div className="auth__form">
+            {leaguesLoading ? (
+              <div className="muted">Loading leagues...</div>
+            ) : myLeagues.length === 0 ? (
+              <div className="muted">No leagues created yet.</div>
+            ) : (
+              myLeagues.map((league) => (
+                <div key={league._id} className="panel-block">
+                  <div>
+                    <label className="label">Name</label>
+                    <div className="input" style={{ display: "flex", alignItems: "center" }}>
+                      {league.name}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">League Code</label>
+                    <div className="input" style={{ display: "flex", alignItems: "center" }}>
+                      {league.code}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </section>

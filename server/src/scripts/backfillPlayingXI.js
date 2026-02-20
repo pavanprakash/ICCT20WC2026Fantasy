@@ -28,7 +28,7 @@ async function run() {
   await mongoose.connect(mongoUri);
   await ensureRules();
   const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
-  const bonus = Number(rules?.additional?.playingXI ?? 2);
+  const bonus = Number(rules?.additional?.playingXI ?? DEFAULT_RULESET.additional.playingXI);
 
   const docs = await FantasyMatchPoints.find({ ruleset: rules.name }).lean();
   let updated = 0;

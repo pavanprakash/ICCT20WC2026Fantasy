@@ -18,6 +18,14 @@ function normalizeName(value) {
     .trim();
 }
 
+function buildRoleMap(players = []) {
+  const out = new Map();
+  for (const p of players) {
+    out.set(normalizeName(p?.name), p?.role || "");
+  }
+  return out;
+}
+
 function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByName = new Map(), boosterPlayerNameKey = null) {
   let total = 0;
   const capKey = normalizeName(captainName);
@@ -221,6 +229,7 @@ router.get("/score/:matchId", async (req, res) => {
   try {
     await ensureRules();
     const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
+    const playerRoleByName = buildRoleMap(await Player.find({}).select("name role").lean());
 
     const { matchId } = req.params;
     const safe = await cricapiGetScorecardSafe(matchId);
@@ -246,16 +255,15 @@ router.get("/score/:matchId", async (req, res) => {
     const scoreRoot = safe.data?.data;
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
     const playingXI = getPlayingXI(scoreRoot);
-    const playingXIBonus = Number(rules?.additional?.playingXI ?? 2);
+    const playingXIBonus = Number(rules?.additional?.playingXI ?? DEFAULT_RULESET.additional.playingXI);
     const points = applyPlayingXIPoints(
-      calculateMatchPoints(scorecard, rules),
+      calculateMatchPoints(scorecard, rules, { playerRoleByName }),
       playingXI,
       playingXIBonus
     );
 
     const warnings = [
-      "Dot ball points and LBW/Bowled bonuses require ball-by-ball data and are not applied.",
-      "Run-out direct/indirect and stumping points require detailed fielding data and may be incomplete.",
+      "Dot ball and direct/indirect run-out points depend on scorecard detail; missing API fields may reduce accuracy.",
       "Captain/Vice-captain multipliers are not applied in this endpoint.",
       "Live match points are provisional and will update as the scorecard changes."
     ];
@@ -284,6 +292,7 @@ router.post("/sync", async (req, res) => {
   try {
     await ensureRules();
     const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
+    const playerRoleByName = buildRoleMap(await Player.find({}).select("name role").lean());
     const seriesInfo = await cricapiGet("/series_info", {
       id: process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510"
     }, process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY);
@@ -321,9 +330,9 @@ router.post("/sync", async (req, res) => {
       }
       const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
       const playingXI = getPlayingXI(scoreRoot);
-      const playingXIBonus = Number(rules?.additional?.playingXI ?? 2);
+      const playingXIBonus = Number(rules?.additional?.playingXI ?? DEFAULT_RULESET.additional.playingXI);
       const points = applyPlayingXIPoints(
-        calculateMatchPoints(scorecard, rules),
+        calculateMatchPoints(scorecard, rules, { playerRoleByName }),
         playingXI,
         playingXIBonus
       );

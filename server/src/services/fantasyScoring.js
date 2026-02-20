@@ -69,6 +69,11 @@ function toNumber(val) {
   return Number.isFinite(num) ? num : 0;
 }
 
+function isPureBowlerRole(roleValue) {
+  const role = String(roleValue || "").toLowerCase();
+  return role.includes("bowl") && !role.includes("all");
+}
+
 function getInnings(scorecardData) {
   if (!scorecardData) return [];
   if (Array.isArray(scorecardData)) return scorecardData;
@@ -109,13 +114,14 @@ function normalizeName(entry) {
   return String(name).trim();
 }
 
-function battingPoints(entry, rules) {
+function battingPoints(entry, rules, options = {}) {
   const runs = toNumber(entry.runs ?? entry.r ?? entry.score);
   const balls = toNumber(entry.balls ?? entry.b);
   const fours = toNumber(entry.fours ?? entry["4s"] ?? entry.four);
   const sixes = toNumber(entry.sixes ?? entry["6s"] ?? entry.six);
   const dismissal = String(entry.dismissal ?? entry.outDesc ?? entry.out ?? "").toLowerCase();
   const out = dismissal.length > 0 && dismissal !== "not out";
+  const applyStrikeRate = options.applyStrikeRate !== false;
 
   let points = 0;
   points += runs * rules.batting.run;
@@ -129,7 +135,7 @@ function battingPoints(entry, rules) {
 
   if (runs === 0 && out) points += rules.batting.duck;
 
-  if (balls >= rules.batting.strikeRate.minBalls) {
+  if (applyStrikeRate && balls >= rules.batting.strikeRate.minBalls) {
     const strikeRate = (runs / balls) * 100;
     if (strikeRate > 170) points += rules.batting.strikeRate.gt170;
     else if (strikeRate > 150) points += rules.batting.strikeRate.between150_170;
@@ -148,9 +154,18 @@ function bowlingPoints(entry, rules) {
   const overs = entry.overs ?? entry.o;
   const maidens = toNumber(entry.maidens ?? entry.m);
   const balls = oversToBalls(overs);
+  const dotBalls = toNumber(
+    entry.dotBalls ??
+    entry.dots ??
+    entry.dotballs ??
+    entry["0s"] ??
+    entry.zeroes ??
+    entry.zeroBalls
+  );
 
   let points = 0;
   points += wickets * rules.bowling.wicket;
+  points += dotBalls * rules.bowling.dotBall;
 
   if (wickets >= 5) points += rules.bowling.bonus5w;
   else if (wickets >= 4) points += rules.bowling.bonus4w;
@@ -168,59 +183,105 @@ function bowlingPoints(entry, rules) {
     else if (economy > 12) points += rules.bowling.economy.above12;
   }
 
-  return { points, wickets, runsConceded, overs, maidens };
+  return { points, wickets, runsConceded, overs, maidens, dotBalls };
 }
 
 function fieldingPoints(entry, rules) {
   const catches = toNumber(entry.catches ?? entry.catch);
   const stumpings = toNumber(entry.stumpings ?? entry.stumping ?? entry.stumped);
   const runoutDirect = toNumber(entry.runoutDirect ?? entry.runout_direct);
-  let runoutIndirect = toNumber(entry.runoutIndirect ?? entry.runout_indirect);
-  const runout = toNumber(entry.runout ?? entry.runOut);
+  const runoutIndirect = toNumber(entry.runoutIndirect ?? entry.runout_indirect);
 
   let points = 0;
   points += catches * rules.fielding.catch;
   if (catches >= 3) points += rules.fielding.threeCatchBonus;
   points += stumpings * rules.fielding.stumping;
   points += runoutDirect * rules.fielding.runoutDirect;
-  if (!runoutIndirect && runout && !runoutDirect) {
-    runoutIndirect = runout;
-  }
   points += runoutIndirect * rules.fielding.runoutIndirect;
 
   return { points, catches, stumpings, runoutDirect, runoutIndirect };
 }
 
-export function calculateMatchPoints(scorecardData, rules) {
+function addPointsToMap(map, name, bucket, points) {
+  if (!name || !points) return;
+  const current = map.get(name) || { name, batting: 0, bowling: 0, fielding: 0 };
+  current[bucket] += points;
+  map.set(name, current);
+}
+
+function parseRunoutFielders(entry) {
+  const names = [];
+  const dismissalText = String(entry?.["dismissal-text"] ?? entry?.dismissalText ?? "").trim();
+  const match = dismissalText.match(/run out\s*\(([^)]+)\)/i);
+  if (match && match[1]) {
+    const split = match[1]
+      .split(/[\/,&]/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+    names.push(...split);
+  }
+  if (!names.length && entry?.catcher?.name) {
+    names.push(String(entry.catcher.name).trim());
+  }
+  return Array.from(new Set(names));
+}
+
+function isLbwOrBowledDismissal(entry) {
+  const dismissal = String(entry?.dismissal || "").toLowerCase();
+  if (dismissal === "lbw" || dismissal === "bowled") return true;
+  const text = String(entry?.["dismissal-text"] ?? entry?.dismissalText ?? "").toLowerCase();
+  if (text.startsWith("lbw b ")) return true;
+  if (/^\bb\s+[a-z]/.test(text)) return true;
+  return false;
+}
+
+export function calculateMatchPoints(scorecardData, rules, options = {}) {
   const innings = getInnings(scorecardData);
   const map = new Map();
+  const roleByName = options?.playerRoleByName instanceof Map ? options.playerRoleByName : new Map();
 
   innings.forEach((inn) => {
     getBattingEntries(inn).forEach((entry) => {
       const name = normalizeName(entry);
       if (!name) return;
-      const current = map.get(name) || { name, batting: 0, bowling: 0, fielding: 0 };
-      const result = battingPoints(entry, rules);
-      current.batting += result.points;
-      map.set(name, current);
+      const role = roleByName.get(normalizeName(name)) || "";
+      const applyStrikeRate =
+        !(rules?.batting?.strikeRate?.exceptBowler && isPureBowlerRole(role));
+      const result = battingPoints(entry, rules, { applyStrikeRate });
+      addPointsToMap(map, name, "batting", result.points);
+
+      // Bowling bonus: wicket by LBW/Bowled
+      if (isLbwOrBowledDismissal(entry)) {
+        const bowlerName = normalizeName(entry?.bowler?.name || entry?.bowler);
+        addPointsToMap(map, bowlerName, "bowling", toNumber(rules?.bowling?.lbwBowledBonus));
+      }
+
+      // Fielding run-out direct/indirect split.
+      const dismissal = String(entry?.dismissal || "").toLowerCase();
+      if (dismissal === "runout" || dismissal === "run out") {
+        const fielders = parseRunoutFielders(entry);
+        if (fielders.length === 1) {
+          addPointsToMap(map, fielders[0], "fielding", toNumber(rules?.fielding?.runoutDirect));
+        } else if (fielders.length > 1) {
+          fielders.forEach((f) => {
+            addPointsToMap(map, f, "fielding", toNumber(rules?.fielding?.runoutIndirect));
+          });
+        }
+      }
     });
 
     getBowlingEntries(inn).forEach((entry) => {
       const name = normalizeName(entry);
       if (!name) return;
-      const current = map.get(name) || { name, batting: 0, bowling: 0, fielding: 0 };
       const result = bowlingPoints(entry, rules);
-      current.bowling += result.points;
-      map.set(name, current);
+      addPointsToMap(map, name, "bowling", result.points);
     });
 
     getFieldingEntries(inn).forEach((entry) => {
       const name = normalizeName(entry);
       if (!name) return;
-      const current = map.get(name) || { name, batting: 0, bowling: 0, fielding: 0 };
       const result = fieldingPoints(entry, rules);
-      current.fielding += result.points;
-      map.set(name, current);
+      addPointsToMap(map, name, "fielding", result.points);
     });
   });
 

@@ -21,6 +21,14 @@ function normalizeName(value) {
     .trim();
 }
 
+function buildRoleMap(players = []) {
+  const out = new Map();
+  for (const p of players) {
+    out.set(normalizeName(p?.name), p?.role || "");
+  }
+  return out;
+}
+
 function isCompletedMatch(match) {
   const ms = String(match?.ms || "").toLowerCase();
   if (ms === "result") return true;
@@ -79,6 +87,8 @@ async function run() {
   await mongoose.connect(mongoUri);
   await ensureRules();
   const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
+  const players = await Player.find({}).lean();
+  const roleByName = buildRoleMap(players);
 
   const debug = String(process.env.DEBUG_SYNC || "").toLowerCase() === "true";
   let matches = [];
@@ -183,9 +193,9 @@ async function run() {
       safe.data;
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
     const playingXI = getPlayingXI(scoreRoot);
-    const playingXIBonus = Number(rules?.additional?.playingXI ?? 2);
+    const playingXIBonus = Number(rules?.additional?.playingXI ?? DEFAULT_RULESET.additional.playingXI);
     const points = applyPlayingXIPoints(
-      calculateMatchPoints(scorecard, rules),
+      calculateMatchPoints(scorecard, rules, { playerRoleByName: roleByName }),
       playingXI,
       playingXIBonus
     );
@@ -234,7 +244,6 @@ async function run() {
     }
   }
 
-  const players = await Player.find({}).lean();
   const bulk = [];
   for (const player of players) {
     const key = normalizeName(player.name);
