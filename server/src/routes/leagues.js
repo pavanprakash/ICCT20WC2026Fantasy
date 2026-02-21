@@ -13,7 +13,7 @@ import { applySuperSubByLowest } from "../services/superSub.js";
 const router = express.Router();
 
 const GROUP_LIMIT = 120;
-const SUPER8_LIMIT = 60;
+const SUPER8_LIMIT = 46;
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
 const CRICAPI_KEY = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
 

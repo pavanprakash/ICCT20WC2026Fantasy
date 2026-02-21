@@ -147,7 +147,7 @@ function diffTransfers(oldIds, newIds) {
 }
 
 const GROUP_LIMIT = 120;
-const SUPER8_LIMIT = 50;
+const SUPER8_LIMIT = 46;
 const LOCK_BEFORE_SECONDS = 5;
 const LOCK_AFTER_MINUTES = 5;
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";

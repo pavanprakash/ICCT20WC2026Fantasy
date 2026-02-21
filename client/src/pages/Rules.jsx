@@ -77,7 +77,7 @@ const RULES = [
       { label: "Transfers count after your first submitted match begins", value: "" },
       { label: "Group stage transfer limit", value: "120" },
       { label: "Unlimited transfers before first Super 8 fixture starts", value: "" },
-      { label: "Super 8 transfer limit", value: "50" },
+      { label: "Super 8 transfer limit", value: "46" },
       { label: "Transfers are locked 5 seconds before match start until 5 minutes after", value: "" }
     ]
   },
@@ -85,13 +85,13 @@ const RULES = [
     title: "Super Sub Rules",
     items: [
       { label: "Optional selection; can be left empty", value: "" },
-      { label: "Used only once per match day (one fixture only)", value: "" },
-      { label: "After use on a day, Super Sub selector is disabled", value: "" },
-      { label: "Selected Super Sub must be in that fixture Playing XI", value: "" },
-      { label: "Replaces the lowest-scoring player from your submitted XI", value: "" },
+      { label: "Must be outside your submitted XI", value: "" },
+      { label: "Cannot be Captain or Vice-Captain at submission time", value: "" },
+      { label: "Can be used only once per match day across fixtures", value: "" },
+      { label: "Applies only if the selected Super Sub is in the official Playing XI", value: "" },
+      { label: "If applied, it replaces the lowest base-points player from your submitted XI", value: "" },
       { label: "If replaced player was Captain/Vice-Captain, Super Sub inherits that multiplier", value: "" },
-      { label: "If Super Sub scores 0, contribution remains 0", value: "" },
-      { label: "Super Sub cannot be captain or vice-captain", value: "" }
+      { label: "If conditions are not met, your original XI remains unchanged", value: "" }
     ]
   }
 ];

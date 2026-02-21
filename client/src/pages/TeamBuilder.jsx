@@ -1075,8 +1075,8 @@ export default function TeamBuilder() {
           {alreadySubmittedForNext ? (
             <div className="notice">You have already submitted your team for the upcoming match.</div>
           ) : null}
-          {firstSubmitFreeWindow && !teamMeta?.submittedForMatchStart ? (
-            <div className="notice">Free changes until your first match starts.</div>
+          {firstSubmitFreeWindow ? (
+            <div className="notice">Unlimited transfers available until the next game starts.</div>
           ) : null}
           {showSuper8PreNotice ? (
             <div className="notice">You are allowed to make unlimited transfers before the start of first Super 8 fixture.</div>
@@ -1096,7 +1096,7 @@ export default function TeamBuilder() {
               {!showSuper8PreNotice ? (
                 <div>Transfers remaining: <strong>{transfersRemaining ?? 0}</strong> / {teamMeta.transfersLimit ?? 120}</div>
               ) : (
-                <div>Transfers remaining: <strong>Unlimited</strong> (Super 8 cap after start: 50)</div>
+                <div>Transfers remaining: <strong>Unlimited</strong> (Super 8 cap after start: 46)</div>
               )}
               <div className="muted">Transfer phase: {transferPhaseLabel}</div>
               {showSuper8PreNotice ? (
