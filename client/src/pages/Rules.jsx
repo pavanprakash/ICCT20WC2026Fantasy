@@ -85,14 +85,13 @@ const RULES = [
     title: "Super Sub Rules",
     items: [
       { label: "Optional selection; can be left empty", value: "" },
-      { label: "Must be outside your submitted XI", value: "" },
-      { label: "Used only once per match day", value: "" },
-      { label: "Replaces the first non-playing XI member for that fixture", value: "" },
-      { label: "If Captain is out, Super Sub becomes Captain", value: "" },
-      { label: "If Vice-Captain is out, Super Sub becomes Vice-Captain", value: "" },
-      { label: "If both are out, Captain takes priority", value: "" },
-      { label: "Inherits any boosters applied for the fixture", value: "" },
-      { label: "Applied when playing XI is available from CricAPI", value: "" }
+      { label: "Used only once per match day (one fixture only)", value: "" },
+      { label: "After use on a day, Super Sub selector is disabled", value: "" },
+      { label: "Selected Super Sub must be in that fixture Playing XI", value: "" },
+      { label: "Replaces the lowest-scoring player from your submitted XI", value: "" },
+      { label: "If replaced player was Captain/Vice-Captain, Super Sub inherits that multiplier", value: "" },
+      { label: "If Super Sub scores 0, contribution remains 0", value: "" },
+      { label: "Super Sub cannot be captain or vice-captain", value: "" }
     ]
   }
 ];

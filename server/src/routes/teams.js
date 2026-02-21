@@ -7,7 +7,7 @@ import TeamSubmission from "../models/TeamSubmission.js";
 import fixtures from "../data/fixtures-2026.js";
 import { cricapiGet } from "../services/cricapi.js";
 import { authRequired } from "../middleware/auth.js";
-import { normalizePlayingXI } from "../services/playingXI.js";
+import { applySuperSubByLowest } from "../services/superSub.js";
 
 const router = express.Router();
 
@@ -36,96 +36,7 @@ function getPlayerNameById(players, idOrObj) {
   return found?.name || null;
 }
 
-function applySuperSub(submission, pointsDoc) {
-  const players = submission?.players || [];
-  const nameSet = new Set(players.map((p) => normalizeName(p.name)));
-  const roleByName = new Map(players.map((p) => [normalizeName(p.name), p.role]));
-  const capName = submission?.captain?.name || getPlayerNameById(players, submission?.captain);
-  const vcName = submission?.viceCaptain?.name || getPlayerNameById(players, submission?.viceCaptain);
-  let effectiveCapName = capName || null;
-  let effectiveVcName = vcName || null;
-
-  const playingXI = normalizePlayingXI(pointsDoc?.playingXI || []);
-  const team1 = submission?.team1 || pointsDoc?.team1 || "";
-  const team2 = submission?.team2 || pointsDoc?.team2 || "";
-  const team1Key = normalizeName(team1);
-  const team2Key = normalizeName(team2);
-  const teamMatches = (p) => {
-    const country = normalizeName(p?.country || "");
-    return (team1Key && country === team1Key) || (team2Key && country === team2Key);
-  };
-  const hasTeamMatch = players.some(teamMatches);
-  const playingMatchesTeam = playingXI.some((name) =>
-    players.some((p) => normalizeName(p.name) === name && teamMatches(p))
-  );
-  if (hasTeamMatch && !playingMatchesTeam) {
-    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
-  }
-  const superSub = submission?.superSub || null;
-
-  if (
-    submission?.superSubApplied &&
-    Array.isArray(submission?.superSubEffectivePlayers) &&
-    submission.superSubEffectivePlayers.length
-  ) {
-    const idSet = new Set(submission.superSubEffectivePlayers.map((id) => String(id)));
-    const effectivePlayers = players.filter((p) => idSet.has(String(p._id)));
-    if (superSub && idSet.has(String(superSub._id)) && !effectivePlayers.some((p) => String(p._id) === String(superSub._id))) {
-      effectivePlayers.push(superSub);
-    }
-    const effectiveCap = submission?.superSubEffectiveCaptain || submission?.captain;
-    const effectiveVc = submission?.superSubEffectiveViceCaptain || submission?.viceCaptain;
-    const effectiveCapNameStored = getPlayerNameById(effectivePlayers, effectiveCap);
-    const effectiveVcNameStored = getPlayerNameById(effectivePlayers, effectiveVc);
-    return {
-      nameSet: new Set(effectivePlayers.map((p) => normalizeName(p.name))),
-      roleByName: new Map(effectivePlayers.map((p) => [normalizeName(p.name), p.role])),
-      capName: effectiveCapNameStored || null,
-      vcName: effectiveVcNameStored || null,
-      superSubUsed: true,
-      superSubName: superSub?.name
-    };
-  }
-
-  if (!superSub || !playingXI.length) {
-    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
-  }
-  const superKey = normalizeName(superSub.name);
-  if (!superKey || !playingXI.includes(superKey)) {
-    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
-  }
-
-  const missing = players.filter((p) => !playingXI.includes(normalizeName(p.name)));
-  if (!missing.length) {
-    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
-  }
-
-  const capKey = normalizeName(effectiveCapName);
-  const vcKey = normalizeName(effectiveVcName);
-  let target = missing.find((p) => normalizeName(p.name) === capKey);
-  if (!target && vcKey) {
-    target = missing.find((p) => normalizeName(p.name) === vcKey);
-  }
-  if (!target) {
-    target = missing[0];
-  }
-  if (!target) {
-    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
-  }
-
-  const targetKey = normalizeName(target.name);
-  nameSet.delete(targetKey);
-  nameSet.add(superKey);
-  roleByName.set(superKey, superSub.role || roleByName.get(superKey) || "");
-
-  if (capKey && targetKey === capKey) {
-    effectiveCapName = superSub.name;
-  } else if (vcKey && targetKey === vcKey) {
-    effectiveVcName = superSub.name;
-  }
-
-  return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: true, superSubName: superSub.name };
-}
+const applySuperSub = applySuperSubByLowest;
 
 function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByName = new Map(), boosterPlayerNameKey = null) {
   let total = 0;
@@ -257,6 +168,44 @@ const ROLE_MIN = {
 
 const normalize = (value) => String(value || "").toLowerCase();
 
+function firstText(...values) {
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text) return text;
+  }
+  return null;
+}
+
+function parseTeams(match) {
+  const teamInfo = Array.isArray(match?.teamInfo) ? match.teamInfo : [];
+  const infoTeams = teamInfo
+    .map((t) => firstText(t?.name, t?.shortname, t?.shortName, t?.teamName))
+    .filter(Boolean);
+  const teamsArray = Array.isArray(match?.teams) ? match.teams : [];
+  const teamsFromArray = teamsArray
+    .map((t) => (typeof t === "string" ? t : firstText(t?.name, t?.shortname, t?.shortName)))
+    .filter(Boolean);
+
+  const team1 = firstText(
+    match?.t1,
+    match?.team1,
+    match?.team1Name,
+    match?.teamA,
+    infoTeams[0],
+    teamsFromArray[0]
+  );
+  const team2 = firstText(
+    match?.t2,
+    match?.team2,
+    match?.team2Name,
+    match?.teamB,
+    infoTeams[1],
+    teamsFromArray[1]
+  );
+
+  return { team1, team2 };
+}
+
 function parseUtc(dateStr, timeStr) {
   if (!dateStr || !timeStr) return null;
   const [h, m] = timeStr.split(":").map(Number);
@@ -296,6 +245,8 @@ function parseMatchStart(match) {
   const date = new Date(dt);
   if (Number.isNaN(date.getTime())) return null;
   const iso = date.toISOString();
+  const { team1, team2 } = parseTeams(match);
+  const fallbackName = team1 && team2 ? `${team1} v ${team2}` : null;
   return {
     id:
       match?.id ||
@@ -303,7 +254,9 @@ function parseMatchStart(match) {
       match?.matchId ||
       match?.unique_id ||
       `${match?.series || match?.seriesName || "series"}-${dt}-${match?.name || "match"}`,
-    name: match?.name || null,
+    name: firstText(match?.name, fallbackName),
+    team1,
+    team2,
     date: iso.slice(0, 10),
     timeGMT: iso.slice(11, 16),
     startMs: date.getTime()
@@ -509,6 +462,9 @@ router.post("/", authRequired, async (req, res) => {
     const superSubIdStr = String(superSubId);
     if (uniqueIds.map(String).includes(superSubIdStr)) {
       return res.status(400).json({ error: "Super Sub must not be in your XI." });
+    }
+    if (String(captainId) === superSubIdStr || String(viceCaptainId) === superSubIdStr) {
+      return res.status(400).json({ error: "Super Sub cannot be captain or vice-captain." });
     }
     superSub = await Player.findById(superSubIdStr).lean();
     if (!superSub) {

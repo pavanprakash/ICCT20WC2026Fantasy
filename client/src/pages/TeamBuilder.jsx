@@ -30,6 +30,7 @@ const SYNC_WINDOW_MS = 10 * 60 * 1000;
 const LOCK_BEFORE_MS = 5 * 1000;
 const LOCK_AFTER_MS = 5 * 60 * 1000;
 const FIRST_SUPER8_START_MS = Date.UTC(2026, 1, 21, 13, 30, 0, 0);
+const TEMP_SUPER_SUB_DISABLED_MATCH_ID = String(import.meta.env.VITE_SUPER_SUB_DISABLED_MATCH_ID || "").trim();
 const formatPrice = (value) => Number(value || 0).toFixed(1);
 const todayUtc = () => {
   const now = new Date();
@@ -700,6 +701,14 @@ export default function TeamBuilder() {
         focusStatus("Super sub cannot be one amongst the submitted team.");
         return;
       }
+      if (superSubTempDisabled && superSubId) {
+        focusStatus("Super Sub is temporarily disabled for this fixture.");
+        return;
+      }
+      if (superSubId && (String(superSubId) === String(captainId) || String(superSubId) === String(viceCaptainId))) {
+        focusStatus("Super Sub cannot be captain or vice-captain.");
+        return;
+      }
 
       const res = await api.post("/teams", {
         name: teamName,
@@ -788,9 +797,9 @@ export default function TeamBuilder() {
     const fixtureName = used.matchName || (used.team1 && used.team2 ? `${used.team1} vs ${used.team2}` : "this fixture");
     return { used: true, fixtureName, matchId: used.matchId };
   }, [submissionHistory, nextMatch?.date]);
-  const superSubDisabled = boosterDisabled || (Boolean(superSubUsage?.used) && (
-    submissionLock.locked || !isEditing
-  ));
+  const superSubTempDisabled = Boolean(TEMP_SUPER_SUB_DISABLED_MATCH_ID) &&
+    String(nextMatch?.id || "") === TEMP_SUPER_SUB_DISABLED_MATCH_ID;
+  const superSubDisabled = boosterDisabled || Boolean(superSubUsage?.used) || superSubTempDisabled;
   const boosterLabel = (type) => {
     switch (type) {
       case "batsman":
@@ -1071,6 +1080,12 @@ export default function TeamBuilder() {
           ) : null}
           {showSuper8PreNotice ? (
             <div className="notice">You are allowed to make unlimited transfers before the start of first Super 8 fixture.</div>
+          ) : null}
+          {superSubUsage?.used ? (
+            <div className="notice">You have already used super sub against {superSubUsage.fixtureName}.</div>
+          ) : null}
+          {superSubTempDisabled ? (
+            <div className="notice">Super Sub is temporarily disabled for this fixture.</div>
           ) : null}
           {teamMeta?.lockedInLeague ? (
             <div className="transfer-summary transfer-summary--team">
