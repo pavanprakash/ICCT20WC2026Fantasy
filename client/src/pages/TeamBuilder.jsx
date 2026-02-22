@@ -60,6 +60,13 @@ const todayUtc = () => {
   return now.toISOString().slice(0, 10);
 };
 
+const addUtcDays = (dateKey, offsetDays) => {
+  const [y, m, d] = String(dateKey).split("-").map(Number);
+  const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+  dt.setUTCDate(dt.getUTCDate() + offsetDays);
+  return dt.toISOString().slice(0, 10);
+};
+
 const nextFixtureDateUtc = () => {
   const today = todayUtc();
   const dates = fixtures.map((f) => f.date);
