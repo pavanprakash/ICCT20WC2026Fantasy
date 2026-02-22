@@ -10,7 +10,7 @@ import allRounderBooster from "../assets/AllRounderBooster.png";
 import teamX2Booster from "../assets/TeamX2.svg";
 import captainX3Booster from "../assets/CAPT-X3.svg";
 
-const BUDGET = 100;
+const BUDGET = Number(import.meta.env.VITE_TEAM_BUDGET_CAP || 100);
 const TEAM_SIZE = 11;
 const MAX_PER_TEAM = 7;
 const ROLE_LIMITS = {
@@ -1025,7 +1025,7 @@ export default function TeamBuilder() {
     <section className="page">
       <div className="page__header">
         <h2>Create Your Team</h2>
-        <p>Pick 11 players under a budget of £100m. Max 7 players from the same team.</p>
+        <p>Pick 11 players under a budget of £{formatPrice(BUDGET)}m. Max 7 players from the same team.</p>
       </div>
 
       <div className="team-builder">

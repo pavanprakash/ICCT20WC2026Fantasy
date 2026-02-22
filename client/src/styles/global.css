@@ -1109,12 +1109,13 @@ main {
 }
 
 .fixture-columns {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: start;
   padding: 4px;
   box-sizing: border-box;
+  width: 100%;
 }
 
 .fixture-column {
@@ -1122,6 +1123,10 @@ main {
   gap: 8px;
   padding: 4px;
   box-sizing: border-box;
+  flex: 1 1 220px;
+  min-width: 220px;
+  max-width: 100%;
+  align-content: start;
 }
 
 .fixture-column__header {
@@ -1149,8 +1154,13 @@ main {
 
 @media (max-width: 768px) {
   .fixture-columns {
+    display: grid;
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+  .fixture-column {
+    min-width: 0;
+    flex: initial;
   }
   .fixture-mini__item {
     padding: 6px 8px;
@@ -1177,15 +1187,20 @@ main {
   padding: 10px;
   width: 100%;
   box-sizing: border-box;
+  display: grid;
+  gap: 2px;
 }
 
 .fixture-mini__time {
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .fixture-mini__teams {
   margin-top: 2px;
   margin-bottom: 6px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 .summary {
   display: grid;
@@ -1342,6 +1357,10 @@ main {
 .panel-block--fixtures .fixture-mini__teams,
 .panel-block--fixtures .muted {
   color: #000000;
+}
+
+.panel-block--fixtures {
+  overflow: hidden;
 }
 
 .fixture-date-select {

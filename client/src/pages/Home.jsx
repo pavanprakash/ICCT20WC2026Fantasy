@@ -1,4 +1,5 @@
 import React from "react";
+const TEAM_BUDGET_CAP = Number(import.meta.env.VITE_TEAM_BUDGET_CAP || 100);
 import { Link } from "react-router-dom";
 
 export default function Home() {
@@ -34,7 +35,7 @@ export default function Home() {
       <div className="grid">
         <div className="card">
           <h4>Balanced Budget</h4>
-          <p>Pick exactly 11 players with a max budget of 100.</p>
+          <p>Pick exactly 11 players with a max budget of {TEAM_BUDGET_CAP}.</p>
         </div>
         <div className="card">
           <h4>Quick Team Builder</h4>

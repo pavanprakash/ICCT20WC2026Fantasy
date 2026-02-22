@@ -148,6 +148,7 @@ function diffTransfers(oldIds, newIds) {
 
 const GROUP_LIMIT = 120;
 const SUPER8_LIMIT = 46;
+const TEAM_BUDGET_CAP = Number(process.env.TEAM_BUDGET_CAP || 100);
 const LOCK_BEFORE_SECONDS = 5;
 const LOCK_AFTER_MINUTES = 5;
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
@@ -493,8 +494,8 @@ router.post("/", authRequired, async (req, res) => {
   }
 
   const totalPrice = players.reduce((sum, p) => sum + p.price, 0);
-  if (totalPrice > 100) {
-    return res.status(400).json({ error: "Budget exceeded (max 100)" });
+  if (totalPrice > TEAM_BUDGET_CAP) {
+    return res.status(400).json({ error: `Budget exceeded (max ${TEAM_BUDGET_CAP})` });
   }
 
   const roleCounts = players.reduce(
