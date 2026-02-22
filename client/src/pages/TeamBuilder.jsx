@@ -31,6 +31,29 @@ const LOCK_BEFORE_MS = 5 * 1000;
 const LOCK_AFTER_MS = 5 * 60 * 1000;
 const FIRST_SUPER8_START_MS = Date.UTC(2026, 1, 21, 13, 30, 0, 0);
 const TEMP_SUPER_SUB_DISABLED_MATCH_ID = String(import.meta.env.VITE_SUPER_SUB_DISABLED_MATCH_ID || "").trim();
+const TEAM_NAME_MAP = {
+  AFG: "Afghanistan",
+  AUS: "Australia",
+  CAN: "Canada",
+  ENG: "England",
+  IND: "India",
+  IRE: "Ireland",
+  ITA: "Italy",
+  NAM: "Namibia",
+  NEP: "Nepal",
+  NED: "Netherlands",
+  NZ: "New Zealand",
+  OMAN: "Oman",
+  PAK: "Pakistan",
+  SCO: "Scotland",
+  SA: "South Africa",
+  SL: "Sri Lanka",
+  UAE: "UAE",
+  US: "USA",
+  USA: "USA",
+  WI: "West Indies",
+  ZIM: "Zimbabwe"
+};
 const formatPrice = (value) => Number(value || 0).toFixed(1);
 const todayUtc = () => {
   const now = new Date();
@@ -45,6 +68,13 @@ const nextFixtureDateUtc = () => {
 };
 
 const roundKey = todayUtc;
+
+const normalizeTeamName = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase();
+  return TEAM_NAME_MAP[upper] || raw;
+};
 
 const parseMatchStart = (match) => {
   if (!match?.date || !match?.timeGMT) return null;
@@ -459,7 +489,7 @@ export default function TeamBuilder() {
     const set = new Set(
       fixtures
         .filter((f) => String(f.stage || "").toLowerCase() === "super 8")
-        .flatMap((f) => [f.team1, f.team2])
+        .flatMap((f) => [normalizeTeamName(f.team1), normalizeTeamName(f.team2)])
         .filter((t) => t && !["SF1", "SF2", "KO", "FINAL"].includes(String(t).toUpperCase()))
     );
     const playerCountries = new Set(players.map((p) => p.country));
