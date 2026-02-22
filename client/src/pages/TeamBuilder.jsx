@@ -400,18 +400,6 @@ export default function TeamBuilder() {
     });
     return Array.from(set).sort();
   }, [fixturesAll]);
-  const fixturesForSelectedDate = useMemo(() => {
-    const dateKey = fixtureDateFilter || todayUtc();
-    const rows = (fixturesAll || [])
-      .filter((m) => m.date === dateKey)
-      .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
-    if (rows.length) return rows;
-    return fixtures
-      .filter((m) => m.date === dateKey)
-      .map((m) => ({ ...m, timeGMT: m.timeGMT || m.time || null, statusLabel: "Scheduled" }))
-      .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
-  }, [fixtureDateFilter, fixturesAll]);
-
   useEffect(() => {
     let mounted = true;
     setDailyPoints((prev) => ({ ...prev, loading: true }));
@@ -1256,9 +1244,8 @@ export default function TeamBuilder() {
             </div>
           </div>
           <div className="panel-block panel-block--fixtures">
-            <div className="panel-title">Upcoming Fixtures (GMT)</div>
-            <div className="filter-group fixture-date-picker">
-              <label className="label">Choose a date to see fixtures</label>
+            <div className="fixture-date-select">
+              <label className="label label--team-filter">Select a date to see fixtures</label>
               <select
                 className="input"
                 value={fixtureDateFilter}
@@ -1271,20 +1258,31 @@ export default function TeamBuilder() {
                 ))}
               </select>
             </div>
-            {fixturesForSelectedDate.length ? (
-              <div className="fixture-mini">
-                {fixturesForSelectedDate.map((match, idx) => (
-                  <div key={match.id || `${fixtureDateFilter || "selected"}-${idx}`} className="fixture-mini__item">
-                    <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
-                    <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
-                    <div className="muted">{match.venue}</div>
-                    <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
+            <div className="panel-title">Upcoming Fixtures (GMT)</div>
+            <div className="fixture-columns">
+              {fixtureDateWindow.map((dateKey) => {
+                const rows = fixturesByWindowDate.get(dateKey) || [];
+                return (
+                  <div className="fixture-column" key={dateKey}>
+                    <div className="fixture-column__header">{dateKey}</div>
+                    {rows.length ? (
+                      <div className="fixture-mini">
+                        {rows.map((match, idx) => (
+                          <div key={match.id || `${dateKey}-${idx}`} className="fixture-mini__item">
+                            <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
+                            <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
+                            <div className="muted">{match.venue}</div>
+                            <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="muted">No fixtures for {dateKey}.</div>
+                    )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="muted">No fixtures for {fixtureDateFilter || todayUtc()}.</div>
-            )}
+                );
+              })}
+            </div>
           </div>
           <div className="muted formation-limits">
             Formation limits: min 3 batters, 3 bowlers, 1 wicket-keeper, 1 all-rounder. Max 5 batters, 5 bowlers, 4 wicket-keepers, 4 all-rounders.
