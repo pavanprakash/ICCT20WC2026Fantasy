@@ -577,15 +577,43 @@ router.post("/", authRequired, async (req, res) => {
     }
   }
 
-  if (superSub && window.nextMatch?.date) {
-    const alreadyUsed = await TeamSubmission.exists({
+  if (window.nextMatch?.date) {
+    const priorSuperSubSubmission = await TeamSubmission.findOne({
       user: req.user.id,
       matchDate: window.nextMatch.date,
       superSub: { $ne: null },
       matchId: { $ne: window.nextMatch.id }
-    });
-    if (alreadyUsed) {
-      return res.status(400).json({ error: "Super Sub already used for this match day." });
+    })
+      .sort({ matchStartMs: 1, createdAt: 1 })
+      .select("superSub")
+      .lean();
+
+    if (priorSuperSubSubmission?.superSub) {
+      const carriedId = String(priorSuperSubSubmission.superSub);
+      if (superSub && String(superSub._id) !== carriedId) {
+        return res.status(400).json({
+          error: "Super Sub already used for this match day. Existing Super Sub will carry over to the next fixture."
+        });
+      }
+      if (!superSub) {
+        superSub = await Player.findById(carriedId).lean();
+      }
+      if (!superSub) {
+        return res.status(400).json({
+          error: "Previously selected Super Sub is unavailable. Please re-select Super Sub for this match day."
+        });
+      }
+      const carriedSuperSubId = String(superSub._id);
+      if (uniqueIds.map(String).includes(carriedSuperSubId)) {
+        return res.status(400).json({
+          error: "Super Sub already used for this day and is carried forward. Remove that player from XI to submit."
+        });
+      }
+      if (String(captainId) === carriedSuperSubId || String(viceCaptainId) === carriedSuperSubId) {
+        return res.status(400).json({
+          error: "Super Sub already used for this day and is carried forward. It cannot be captain or vice-captain."
+        });
+      }
     }
   }
 

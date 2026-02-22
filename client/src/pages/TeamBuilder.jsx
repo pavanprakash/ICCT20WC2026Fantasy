@@ -37,6 +37,13 @@ const todayUtc = () => {
   return now.toISOString().slice(0, 10);
 };
 
+const addUtcDays = (dateKey, offsetDays) => {
+  const [y, m, d] = String(dateKey).split("-").map(Number);
+  const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+  dt.setUTCDate(dt.getUTCDate() + offsetDays);
+  return dt.toISOString().slice(0, 10);
+};
+
 const nextFixtureDateUtc = () => {
   const today = todayUtc();
   const dates = fixtures.map((f) => f.date);
@@ -351,16 +358,20 @@ export default function TeamBuilder() {
     setFixtureStatus(matches.length ? "ok" : "empty");
   }, [fixtureDateFilter, fixturesAll]);
 
-  const todayDateKey = "2026-02-21";
-  const tomorrowDateKey = "2026-02-22";
-  const fixturesToday = useMemo(
-    () => fixtures.filter((m) => m.date === todayDateKey),
-    [todayDateKey]
-  );
-  const fixturesTomorrow = useMemo(
-    () => fixtures.filter((m) => m.date === tomorrowDateKey),
-    [tomorrowDateKey]
-  );
+  const fixtureDateWindow = useMemo(() => {
+    const start = todayUtc();
+    return [0, 1, 2].map((offset) => addUtcDays(start, offset));
+  }, [fixturesAll]);
+  const fixturesByWindowDate = useMemo(() => {
+    const byDate = new Map();
+    for (const dateKey of fixtureDateWindow) {
+      const rows = (fixturesAll || [])
+        .filter((m) => m.date === dateKey)
+        .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
+      byDate.set(dateKey, rows);
+    }
+    return byDate;
+  }, [fixtureDateWindow, fixturesAll]);
 
   useEffect(() => {
     let mounted = true;
@@ -782,7 +793,11 @@ export default function TeamBuilder() {
     if (!nextMatch?.date || !submissionHistory.length) return null;
     const used = submissionHistory.find((s) => {
       const matchDate = s.matchDate || (s.matchStartMs ? new Date(s.matchStartMs).toISOString().slice(0, 10) : null);
-      return matchDate === nextMatch.date && s.superSub;
+      return (
+        matchDate === nextMatch.date &&
+        s.superSub &&
+        String(s.matchId || "") !== String(nextMatch.id || "")
+      );
     });
     if (!used) return null;
     const fixtureName = used.matchName || (used.team1 && used.team2 ? `${used.team1} vs ${used.team2}` : "this fixture");
@@ -1070,7 +1085,7 @@ export default function TeamBuilder() {
             <div className="notice">You are allowed to make unlimited transfers before the start of first Super 8 fixture.</div>
           ) : null}
           {superSubUsage?.used ? (
-            <div className="notice">You have already used super sub against {superSubUsage.fixtureName}.</div>
+            <div className="notice">Super Sub already used against {superSubUsage.fixtureName}; it will be carried over to the next fixture today.</div>
           ) : null}
           {superSubTempDisabled ? (
             <div className="notice">Super Sub is temporarily disabled for this fixture.</div>
@@ -1184,40 +1199,28 @@ export default function TeamBuilder() {
           <div className="panel-block panel-block--fixtures">
             <div className="panel-title">Upcoming Fixtures (GMT)</div>
             <div className="fixture-columns">
-              <div className="fixture-column">
-                <div className="fixture-column__header">{todayDateKey}</div>
-                {fixturesToday.length ? (
-                  <div className="fixture-mini">
-                    {fixturesToday.map((match, idx) => (
-                      <div key={match.id || idx} className="fixture-mini__item">
-                        <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
-                        <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
-                        <div className="muted">{match.venue}</div>
-                        <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
+              {fixtureDateWindow.map((dateKey) => {
+                const rows = fixturesByWindowDate.get(dateKey) || [];
+                return (
+                  <div className="fixture-column" key={dateKey}>
+                    <div className="fixture-column__header">{dateKey}</div>
+                    {rows.length ? (
+                      <div className="fixture-mini">
+                        {rows.map((match, idx) => (
+                          <div key={match.id || `${dateKey}-${idx}`} className="fixture-mini__item">
+                            <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
+                            <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
+                            <div className="muted">{match.venue}</div>
+                            <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    ) : (
+                      <div className="muted">No fixtures for {dateKey}.</div>
+                    )}
                   </div>
-                ) : (
-                  <div className="muted">No fixtures for {todayDateKey}.</div>
-                )}
-              </div>
-              <div className="fixture-column">
-                <div className="fixture-column__header">{tomorrowDateKey}</div>
-                {fixturesTomorrow.length ? (
-                  <div className="fixture-mini">
-                    {fixturesTomorrow.map((match, idx) => (
-                      <div key={match.id || idx} className="fixture-mini__item">
-                        <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
-                        <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
-                        <div className="muted">{match.venue}</div>
-                        <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="muted">No fixtures for {tomorrowDateKey}.</div>
-                )}
-              </div>
+                );
+              })}
             </div>
           </div>
           <div className="muted formation-limits">
@@ -1235,8 +1238,7 @@ export default function TeamBuilder() {
               saveTeam();
             }}
             disabled={
-              isSubmissionLocked ||
-              alreadySubmittedForNext
+              isSubmissionLocked
             }
           >
             {teamMeta && !isEditing ? "Update Team" : selected.length > 0 ? "Submit Team" : "Select Team"}
