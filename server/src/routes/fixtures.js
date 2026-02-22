@@ -87,7 +87,7 @@ router.get("/", async (req, res) => {
     }
 
     const matches = list
-      .filter((match) => normalize(match?.series || match?.seriesName) === "icc men's t20 world cup 2026")
+      .filter((match) => isTargetMatch(match))
       .filter((match) => {
         const status = normalize(match?.matchStatus || match?.status || "");
         const isCompleted = /match ended|result|won|abandoned|no result|draw|tied|complete|completed|match over|finished/.test(status);

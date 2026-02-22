@@ -61,6 +61,18 @@ const parseMatchStart = (match) => {
 };
 
 const fixtureKey = (match) => `${match?.date || ""}|${match?.timeGMT || match?.time || ""}`;
+const PLACEHOLDER_TEAMS = new Set(["TBC", "TBD", "KO", "SF1", "SF2", "FINAL"]);
+
+const isPlaceholderTeam = (value) => {
+  const key = String(value || "").trim().toUpperCase();
+  return PLACEHOLDER_TEAMS.has(key);
+};
+
+const pickTeamName = (localValue, apiValue) => {
+  if (!localValue) return apiValue || null;
+  if (isPlaceholderTeam(localValue) && apiValue && !isPlaceholderTeam(apiValue)) return apiValue;
+  return localValue || apiValue || null;
+};
 
 const mergeFixturesWithLocal = (apiMatches = []) => {
   const localByKey = new Map(
@@ -75,8 +87,8 @@ const mergeFixturesWithLocal = (apiMatches = []) => {
     if (local) {
       merged.push({
         ...apiMatch,
-        team1: local.team1 || apiMatch.team1,
-        team2: local.team2 || apiMatch.team2,
+        team1: pickTeamName(local.team1, apiMatch.team1),
+        team2: pickTeamName(local.team2, apiMatch.team2),
         venue: local.venue || apiMatch.venue,
         stage: local.stage || apiMatch.stage,
         date: local.date || apiMatch.date,
