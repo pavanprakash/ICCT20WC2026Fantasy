@@ -98,6 +98,13 @@ const isPlaceholderTeam = (value) => {
   return PLACEHOLDER_TEAMS.has(key);
 };
 
+const hasConcreteTeams = (match) => {
+  return !(
+    isPlaceholderTeam(match?.team1) &&
+    isPlaceholderTeam(match?.team2)
+  );
+};
+
 const pickTeamName = (localValue, apiValue) => {
   if (!localValue) return apiValue || null;
   if (isPlaceholderTeam(localValue) && apiValue && !isPlaceholderTeam(apiValue)) return apiValue;
@@ -108,6 +115,13 @@ const mergeFixturesWithLocal = (apiMatches = []) => {
   const localByKey = new Map(
     fixtures.map((m) => [fixtureKey(m), { ...m, timeGMT: m.timeGMT || m.time || null }])
   );
+  const localConcreteByDate = new Map();
+  for (const m of fixtures) {
+    const dateKey = String(m?.date || "");
+    if (!dateKey) continue;
+    const isConcrete = !isPlaceholderTeam(m?.team1) && !isPlaceholderTeam(m?.team2);
+    if (isConcrete) localConcreteByDate.set(dateKey, true);
+  }
   const merged = [];
   const seen = new Set();
 
@@ -124,16 +138,30 @@ const mergeFixturesWithLocal = (apiMatches = []) => {
         date: local.date || apiMatch.date,
         timeGMT: local.timeGMT || apiMatch.timeGMT || apiMatch.time || null
       });
+      if (!hasConcreteTeams(merged[merged.length - 1])) {
+        merged.pop();
+      }
       seen.add(key);
     } else {
-      merged.push(apiMatch);
+      const apiHasPlaceholderTeams =
+        isPlaceholderTeam(apiMatch?.team1) || isPlaceholderTeam(apiMatch?.team2);
+      const hasConcreteLocalForDate = Boolean(localConcreteByDate.get(String(apiMatch?.date || "")));
+      if (apiHasPlaceholderTeams && hasConcreteLocalForDate) {
+        continue;
+      }
+      if (hasConcreteTeams(apiMatch)) {
+        merged.push(apiMatch);
+      }
     }
   }
 
   for (const local of fixtures) {
     const key = fixtureKey(local);
     if (!seen.has(key)) {
-      merged.push({ ...local, timeGMT: local.timeGMT || local.time || null, statusLabel: "Scheduled" });
+      const localRow = { ...local, timeGMT: local.timeGMT || local.time || null, statusLabel: "Scheduled" };
+      if (hasConcreteTeams(localRow)) {
+        merged.push(localRow);
+      }
     }
   }
 
@@ -425,6 +453,7 @@ export default function TeamBuilder() {
       }
       const localRows = fixtures
         .filter((m) => m.date === dateKey)
+        .filter((m) => hasConcreteTeams(m))
         .map((m) => ({ ...m, timeGMT: m.timeGMT || m.time || null, statusLabel: "Scheduled" }))
         .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
       byDate.set(dateKey, localRows);
