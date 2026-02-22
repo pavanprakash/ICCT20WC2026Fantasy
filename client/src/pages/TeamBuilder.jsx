@@ -633,14 +633,6 @@ export default function TeamBuilder() {
     const minutes = Math.max(0, Math.ceil((lockMeta.lockUntil - Date.now()) / 60000));
     return minutes;
   }, [isSubmissionLocked, lockMeta.lockUntil]);
-  const firstSubmitFreeWindow = useMemo(() => {
-    if (!nextMatch?.startMs) return false;
-    const start = Number(nextMatch.startMs);
-    if (!Number.isFinite(start)) return false;
-    const used = teamMeta?.transfersUsedTotal ?? 0;
-    return Date.now() < start && used === 0;
-  }, [nextMatch?.startMs, teamMeta?.transfersUsedTotal]);
-
   const alreadySubmittedForNext =
     teamMeta?.submittedForMatchId &&
     nextMatch?.id &&
@@ -1073,9 +1065,6 @@ export default function TeamBuilder() {
           ) : null}
           {alreadySubmittedForNext ? (
             <div className="notice">You have already submitted your team for the upcoming match.</div>
-          ) : null}
-          {firstSubmitFreeWindow && !alreadySubmittedForNext ? (
-            <div className="notice">Unlimited transfers available until the next game starts.</div>
           ) : null}
           {showSuper8PreNotice ? (
             <div className="notice">You are allowed to make unlimited transfers before the start of first Super 8 fixture.</div>
