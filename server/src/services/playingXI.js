@@ -64,6 +64,39 @@ function extractPlayingXIFields(scoreRoot) {
   return Array.from(new Set(names.map((n) => String(n).trim()).filter(Boolean)));
 }
 
+function extractSubstituteFields(scoreRoot) {
+  const names = [];
+  const addNames = (list) => {
+    if (!Array.isArray(list)) return;
+    list.forEach((val) => {
+      const name = extractName(val);
+      if (name) names.push(name);
+    });
+  };
+  const scan = (obj, depth = 0) => {
+    if (!obj || typeof obj !== "object" || depth > 4) return;
+    for (const [key, value] of Object.entries(obj)) {
+      if (!value) continue;
+      const lower = key.toLowerCase();
+      const isSubKey =
+        lower.includes("substitute") ||
+        lower.includes("replacement") ||
+        lower.includes("impact");
+      if (isSubKey) {
+        if (Array.isArray(value)) {
+          addNames(value);
+        } else if (typeof value === "object") {
+          scan(value, depth + 1);
+        }
+      } else if (typeof value === "object") {
+        scan(value, depth + 1);
+      }
+    }
+  };
+  scan(scoreRoot, 0);
+  return Array.from(new Set(names.map((n) => String(n).trim()).filter(Boolean)));
+}
+
 function inferFromInnings(scoreRoot) {
   const names = new Set();
   const innings = getInnings(scoreRoot);
@@ -86,6 +119,13 @@ export function getPlayingXI(scoreRoot) {
   const direct = extractPlayingXIFields(scoreRoot);
   if (direct.length) return direct;
   return inferFromInnings(scoreRoot);
+}
+
+export function getPlayingSubstitutes(scoreRoot, playingXI = []) {
+  const subs = extractSubstituteFields(scoreRoot);
+  if (!subs.length) return [];
+  const xiSet = new Set((playingXI || []).map((n) => normalizeName(n)).filter(Boolean));
+  return subs.filter((name) => !xiSet.has(normalizeName(name)));
 }
 
 export function normalizePlayingXI(list) {

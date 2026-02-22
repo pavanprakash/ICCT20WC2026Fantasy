@@ -149,7 +149,7 @@ const MATCHES = [
   }
 ];
 
-const PLAYING_XI_BONUS = Number(DEFAULT_RULESET?.additional?.playingXI ?? 2);
+const PLAYING_XI_BONUS = Number(DEFAULT_RULESET?.additional?.playingXI ?? 4);
 
 const MATCHES_WITH_TOTALS = MATCHES.map((match) => {
   const base = match.points.map((p) => ({ ...p, total: p.batting + p.bowling + p.fielding }));

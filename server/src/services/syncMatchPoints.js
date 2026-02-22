@@ -3,7 +3,7 @@ import FantasyMatchPoints from "../models/FantasyMatchPoints.js";
 import Player from "../models/Player.js";
 import { cricapiGet, cricapiGetScorecardSafe } from "./cricapi.js";
 import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "./fantasyScoring.js";
-import { getPlayingXI } from "./playingXI.js";
+import { getPlayingSubstitutes, getPlayingXI } from "./playingXI.js";
 
 function normalizeName(value) {
   return String(value || "")
@@ -65,11 +65,17 @@ export async function syncMatchPoints(matchId, { scorecardKey } = {}) {
     safe.data;
   const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
   const playingXI = getPlayingXI(scoreRoot);
+  const playingSubstitutes = getPlayingSubstitutes(scoreRoot, playingXI);
   const playingXIBonus = Number(rules?.additional?.playingXI ?? DEFAULT_RULESET.additional.playingXI);
+  const playingSubstituteBonus = Number(
+    rules?.additional?.playingSubstitute ?? DEFAULT_RULESET.additional.playingSubstitute
+  );
   const points = applyPlayingXIPoints(
     calculateMatchPoints(scorecard, rules, { playerRoleByName: roleByName }),
     playingXI,
-    playingXIBonus
+    playingXIBonus,
+    playingSubstitutes,
+    playingSubstituteBonus
   );
   if (!points.length) {
     throw new Error("No points computed from scorecard.");
@@ -79,7 +85,7 @@ export async function syncMatchPoints(matchId, { scorecardKey } = {}) {
   const matchStartMs = matchStartMsFromMatch(matchData);
   await FantasyMatchPoints.findOneAndUpdate(
     { matchId, ruleset: rules.name },
-    { matchId, matchDate, matchStartMs, ruleset: rules.name, points, playingXI },
+    { matchId, matchDate, matchStartMs, ruleset: rules.name, points, playingXI, playingSubstitutes },
     { upsert: true, new: true }
   );
 

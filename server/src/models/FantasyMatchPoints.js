@@ -8,7 +8,8 @@ const FantasyMatchPointsSchema = new mongoose.Schema(
     ruleset: { type: String, required: true },
     points: { type: Array, required: true },
     warnings: { type: Array, default: [] },
-    playingXI: { type: [String], default: [] }
+    playingXI: { type: [String], default: [] },
+    playingSubstitutes: { type: [String], default: [] }
   },
   { timestamps: true }
 );

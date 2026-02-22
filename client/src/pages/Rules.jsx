@@ -96,6 +96,14 @@ const RULES = [
   }
 ];
 
+const MISMATCHES = [
+  {
+    rule: "Playing Substitute (+4 pts)",
+    status: "Data-dependent",
+    detail: "Applied only when scorecard includes substitute/replacement entries. If provider omits substitutes, points cannot be awarded."
+  }
+];
+
 export default function Rules() {
   return (
     <section className="page">
@@ -118,6 +126,17 @@ export default function Rules() {
             </div>
           </div>
         ))}
+        <div className="rules-card" key="Scoring Mismatch Check">
+          <h3>Scoring Mismatch Check</h3>
+          <div className="rules-list">
+            {MISMATCHES.map((item, idx) => (
+              <div className="rules-row" key={`mismatch-${idx}`}>
+                <span>{item.rule} - {item.detail}</span>
+                <span className="rules-value">{item.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );

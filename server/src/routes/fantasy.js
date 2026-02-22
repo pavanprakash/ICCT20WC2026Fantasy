@@ -7,7 +7,7 @@ import TeamSubmission from "../models/TeamSubmission.js";
 import { authRequired } from "../middleware/auth.js";
 import { cricapiGet } from "../services/cricapi.js";
 import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
-import { getPlayingXI } from "../services/playingXI.js";
+import { getPlayingSubstitutes, getPlayingXI } from "../services/playingXI.js";
 import { applySuperSubByLowest } from "../services/superSub.js";
 
 const router = express.Router();
@@ -167,15 +167,22 @@ router.get("/score/:matchId", async (req, res) => {
     const scoreRoot = safe.data?.data;
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
     const playingXI = getPlayingXI(scoreRoot);
+    const playingSubstitutes = getPlayingSubstitutes(scoreRoot, playingXI);
     const playingXIBonus = Number(rules?.additional?.playingXI ?? DEFAULT_RULESET.additional.playingXI);
+    const playingSubstituteBonus = Number(
+      rules?.additional?.playingSubstitute ?? DEFAULT_RULESET.additional.playingSubstitute
+    );
     const points = applyPlayingXIPoints(
       calculateMatchPoints(scorecard, rules, { playerRoleByName }),
       playingXI,
-      playingXIBonus
+      playingXIBonus,
+      playingSubstitutes,
+      playingSubstituteBonus
     );
 
     const warnings = [
       "Dot ball and direct/indirect run-out points depend on scorecard detail; missing API fields may reduce accuracy.",
+      "Playing substitute (+4) is applied only when scorecard provides substitute/replacement data.",
       "Captain/Vice-captain multipliers are not applied in this endpoint.",
       "Live match points are provisional and will update as the scorecard changes."
     ];
@@ -184,6 +191,7 @@ router.get("/score/:matchId", async (req, res) => {
       matchId,
       ruleset: rules.name,
       points,
+      playingSubstitutes,
       warnings
     };
 
@@ -242,11 +250,17 @@ router.post("/sync", async (req, res) => {
       }
       const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
       const playingXI = getPlayingXI(scoreRoot);
+      const playingSubstitutes = getPlayingSubstitutes(scoreRoot, playingXI);
       const playingXIBonus = Number(rules?.additional?.playingXI ?? DEFAULT_RULESET.additional.playingXI);
+      const playingSubstituteBonus = Number(
+        rules?.additional?.playingSubstitute ?? DEFAULT_RULESET.additional.playingSubstitute
+      );
       const points = applyPlayingXIPoints(
         calculateMatchPoints(scorecard, rules, { playerRoleByName }),
         playingXI,
-        playingXIBonus
+        playingXIBonus,
+        playingSubstitutes,
+        playingSubstituteBonus
       );
       if (!points.length) {
         continue;
@@ -257,7 +271,7 @@ router.post("/sync", async (req, res) => {
       const matchStartMs = matchStartMsFromMatch(match);
       await FantasyMatchPoints.findOneAndUpdate(
         { matchId: matchId, ruleset: rules.name },
-        { matchId: matchId, matchDate, matchStartMs, ruleset: rules.name, points, playingXI },
+        { matchId: matchId, matchDate, matchStartMs, ruleset: rules.name, points, playingXI, playingSubstitutes },
         { upsert: true, new: true }
       );
 

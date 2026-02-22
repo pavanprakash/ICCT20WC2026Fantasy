@@ -7,7 +7,7 @@ import User from "../models/User.js";
 import TeamSubmission from "../models/TeamSubmission.js";
 import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
 import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
-import { getPlayingXI } from "../services/playingXI.js";
+import { getPlayingSubstitutes, getPlayingXI } from "../services/playingXI.js";
 import { applySuperSubByLowest } from "../services/superSub.js";
 
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
@@ -19,6 +19,14 @@ function normalizeName(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function buildRoleMap(players = []) {
+  const out = new Map();
+  for (const p of players) {
+    out.set(normalizeName(p?.name), p?.role || "");
+  }
+  return out;
 }
 
 function getPlayerNameById(players, idOrObj) {
@@ -69,6 +77,8 @@ async function ensureRules() {
 async function syncFantasyPoints() {
   await ensureRules();
   const rules = await FantasyRule.findOne({ name: DEFAULT_RULESET.name }).lean();
+  const players = await Player.find({}).lean();
+  const roleByName = buildRoleMap(players);
 
   const seriesInfo = await cricapiGet("/series_info", { id: SERIES_ID }, SERIES_KEY);
   const rawMatches =
@@ -104,11 +114,17 @@ async function syncFantasyPoints() {
     }
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
     const playingXI = getPlayingXI(scoreRoot);
+    const playingSubstitutes = getPlayingSubstitutes(scoreRoot, playingXI);
     const playingXIBonus = Number(rules?.additional?.playingXI ?? DEFAULT_RULESET.additional.playingXI);
+    const playingSubstituteBonus = Number(
+      rules?.additional?.playingSubstitute ?? DEFAULT_RULESET.additional.playingSubstitute
+    );
     const points = applyPlayingXIPoints(
-      calculateMatchPoints(scorecard, rules),
+      calculateMatchPoints(scorecard, rules, { playerRoleByName: roleByName }),
       playingXI,
-      playingXIBonus
+      playingXIBonus,
+      playingSubstitutes,
+      playingSubstituteBonus
     );
     if (!points.length) {
       continue;
@@ -118,7 +134,7 @@ async function syncFantasyPoints() {
     const matchDate = matchDateFromMatch(match);
     await FantasyMatchPoints.findOneAndUpdate(
       { matchId: matchId, ruleset: rules.name },
-      { matchId: matchId, matchDate, ruleset: rules.name, points, playingXI },
+      { matchId: matchId, matchDate, ruleset: rules.name, points, playingXI, playingSubstitutes },
       { upsert: true, new: true }
     );
 
@@ -129,7 +145,6 @@ async function syncFantasyPoints() {
     }
   }
 
-  const players = await Player.find({}).lean();
   const bulk = [];
   for (const player of players) {
     const key = normalizeName(player.name);

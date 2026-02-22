@@ -293,10 +293,17 @@ export function calculateMatchPoints(scorecardData, rules, options = {}) {
   return points.sort((a, b) => b.total - a.total);
 }
 
-export function applyPlayingXIPoints(points = [], playingXI = [], bonus = 2) {
+export function applyPlayingXIPoints(
+  points = [],
+  playingXI = [],
+  bonus = Number(DEFAULT_RULESET?.additional?.playingXI ?? 4),
+  playingSubstitutes = [],
+  substituteBonus = Number(DEFAULT_RULESET?.additional?.playingSubstitute ?? 4)
+) {
   const list = Array.isArray(points) ? points.map((p) => ({ ...p })) : [];
   const lookup = new Map(list.map((p) => [normalizeName(p.name), p]));
   const xi = Array.isArray(playingXI) ? playingXI : [];
+  const substitutes = Array.isArray(playingSubstitutes) ? playingSubstitutes : [];
   xi.forEach((name) => {
     const key = normalizeName(name);
     if (!key) return;
@@ -310,5 +317,28 @@ export function applyPlayingXIPoints(points = [], playingXI = [], bonus = 2) {
       lookup.set(key, entry);
     }
   });
+
+  const xiKeys = new Set(xi.map((name) => normalizeName(name)).filter(Boolean));
+  substitutes.forEach((name) => {
+    const key = normalizeName(name);
+    if (!key || xiKeys.has(key)) return;
+    const current = lookup.get(key);
+    if (current) {
+      current.substituteAppearance = (current.substituteAppearance || 0) + substituteBonus;
+      current.total = (current.total || 0) + substituteBonus;
+    } else {
+      const entry = {
+        name,
+        batting: 0,
+        bowling: 0,
+        fielding: 0,
+        substituteAppearance: substituteBonus,
+        total: substituteBonus
+      };
+      list.push(entry);
+      lookup.set(key, entry);
+    }
+  });
+
   return list.sort((a, b) => b.total - a.total);
 }
