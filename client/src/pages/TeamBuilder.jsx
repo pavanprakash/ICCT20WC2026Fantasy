@@ -644,8 +644,7 @@ export default function TeamBuilder() {
   const alreadySubmittedForNext =
     teamMeta?.submittedForMatchId &&
     nextMatch?.id &&
-    teamMeta.submittedForMatchId === nextMatch.id &&
-    !firstSubmitFreeWindow;
+    teamMeta.submittedForMatchId === nextMatch.id;
   const hasCaptains = Boolean(captainId) && Boolean(viceCaptainId) && captainId !== viceCaptainId;
   const formationOk =
     roleCounts.bat <= ROLE_LIMITS.bat &&
@@ -1075,7 +1074,7 @@ export default function TeamBuilder() {
           {alreadySubmittedForNext ? (
             <div className="notice">You have already submitted your team for the upcoming match.</div>
           ) : null}
-          {firstSubmitFreeWindow ? (
+          {firstSubmitFreeWindow && !alreadySubmittedForNext ? (
             <div className="notice">Unlimited transfers available until the next game starts.</div>
           ) : null}
           {showSuper8PreNotice ? (
