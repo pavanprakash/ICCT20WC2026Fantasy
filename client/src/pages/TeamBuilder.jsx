@@ -37,13 +37,6 @@ const todayUtc = () => {
   return now.toISOString().slice(0, 10);
 };
 
-const addUtcDays = (dateKey, offsetDays) => {
-  const [y, m, d] = String(dateKey).split("-").map(Number);
-  const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1));
-  dt.setUTCDate(dt.getUTCDate() + offsetDays);
-  return dt.toISOString().slice(0, 10);
-};
-
 const nextFixtureDateUtc = () => {
   const today = todayUtc();
   const dates = fixtures.map((f) => f.date);
@@ -370,20 +363,24 @@ export default function TeamBuilder() {
     setFixtureStatus(matches.length ? "ok" : "empty");
   }, [fixtureDateFilter, fixturesAll]);
 
-  const fixtureDateWindow = useMemo(() => {
-    const start = todayUtc();
-    return [0, 1, 2].map((offset) => addUtcDays(start, offset));
+  const fixtureDateOptions = useMemo(() => {
+    const set = new Set((fixturesAll || []).map((m) => m.date).filter(Boolean));
+    fixtures.forEach((m) => {
+      if (m?.date) set.add(m.date);
+    });
+    return Array.from(set).sort();
   }, [fixturesAll]);
-  const fixturesByWindowDate = useMemo(() => {
-    const byDate = new Map();
-    for (const dateKey of fixtureDateWindow) {
-      const rows = (fixturesAll || [])
-        .filter((m) => m.date === dateKey)
-        .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
-      byDate.set(dateKey, rows);
-    }
-    return byDate;
-  }, [fixtureDateWindow, fixturesAll]);
+  const fixturesForSelectedDate = useMemo(() => {
+    const dateKey = fixtureDateFilter || todayUtc();
+    const rows = (fixturesAll || [])
+      .filter((m) => m.date === dateKey)
+      .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
+    if (rows.length) return rows;
+    return fixtures
+      .filter((m) => m.date === dateKey)
+      .map((m) => ({ ...m, timeGMT: m.timeGMT || m.time || null, statusLabel: "Scheduled" }))
+      .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
+  }, [fixtureDateFilter, fixturesAll]);
 
   useEffect(() => {
     let mounted = true;
@@ -459,9 +456,29 @@ export default function TeamBuilder() {
   }, [lockMeta.firstStart, lockMeta.lockUntil]);
 
   const teams = useMemo(() => {
-    const set = new Set(players.map((p) => p.country));
-    return ["all", ...Array.from(set).sort()];
+    const set = new Set(
+      fixtures
+        .filter((f) => String(f.stage || "").toLowerCase() === "super 8")
+        .flatMap((f) => [f.team1, f.team2])
+        .filter((t) => t && !["SF1", "SF2", "KO", "FINAL"].includes(String(t).toUpperCase()))
+    );
+    const playerCountries = new Set(players.map((p) => p.country));
+    const qualified = Array.from(set).filter((c) => playerCountries.has(c));
+    return ["all", ...qualified.sort()];
   }, [players]);
+
+  const super8Players = useMemo(() => {
+    const allowed = new Set(teams.filter((t) => t !== "all"));
+    return players.filter((p) => allowed.has(p.country));
+  }, [players, teams]);
+
+  useEffect(() => {
+    setTeamFilter((prev) => {
+      if (!prev?.length) return prev;
+      const allowed = new Set(teams.filter((t) => t !== "all"));
+      return prev.filter((t) => allowed.has(t));
+    });
+  }, [teams]);
 
   const teamOptions = useMemo(() => teams.filter((t) => t !== "all"), [teams]);
   const teamFilterLabel = useMemo(() => {
@@ -471,9 +488,9 @@ export default function TeamBuilder() {
   }, [teamFilter]);
 
   const roles = useMemo(() => {
-    const set = new Set(players.map((p) => p.role).filter(Boolean));
+    const set = new Set(super8Players.map((p) => p.role).filter(Boolean));
     return ["all", ...Array.from(set).sort()];
-  }, [players]);
+  }, [super8Players]);
 
   const priceRanges = useMemo(
     () => [
@@ -575,7 +592,7 @@ export default function TeamBuilder() {
     const max = maxRaw ? Number(maxRaw) : null;
     const minOk = min === null || !Number.isNaN(min);
     const maxOk = max === null || !Number.isNaN(max);
-    return players
+    return super8Players
       .filter((p) => {
       const matchQuery = !q || p.name.toLowerCase().includes(q);
       const matchTeam = teamFilter.length === 0 || teamFilter.includes(p.country);
@@ -595,7 +612,7 @@ export default function TeamBuilder() {
       if (bPoints !== aPoints) return bPoints - aPoints;
       return String(a.name || "").localeCompare(String(b.name || ""));
     });
-  }, [players, query, teamFilter, roleFilter, priceRange]);
+  }, [super8Players, query, teamFilter, roleFilter, priceRange]);
 
   const toggle = (id) => {
     setStatus(null);
@@ -799,8 +816,8 @@ export default function TeamBuilder() {
   const boosterDisabled = !isEditing;
   const superSubOptions = useMemo(() => {
     const selectedSet = new Set(selected.map(String));
-    return players.filter((p) => !selectedSet.has(String(p._id)));
-  }, [players, selected]);
+    return super8Players.filter((p) => !selectedSet.has(String(p._id)));
+  }, [super8Players, selected]);
   const superSubUsage = useMemo(() => {
     if (!nextMatch?.date || !submissionHistory.length) return null;
     const used = submissionHistory.find((s) => {
@@ -877,7 +894,7 @@ export default function TeamBuilder() {
       setStatus("Click Update Team to make changes.");
       return;
     }
-    if (!players.length) {
+    if (!super8Players.length) {
       setStatus("Players not loaded yet.");
       return;
     }
@@ -888,7 +905,7 @@ export default function TeamBuilder() {
     const teamCountsLocal = {};
     let totalCostLocal = 0;
 
-    const candidates = players.map((p) => ({
+    const candidates = super8Players.map((p) => ({
       ...p,
       roleKey: roleKey(p),
       pointsValue: Number(p.points ?? p.fantasyPoints ?? 0),
@@ -1210,30 +1227,34 @@ export default function TeamBuilder() {
           </div>
           <div className="panel-block panel-block--fixtures">
             <div className="panel-title">Upcoming Fixtures (GMT)</div>
-            <div className="fixture-columns">
-              {fixtureDateWindow.map((dateKey) => {
-                const rows = fixturesByWindowDate.get(dateKey) || [];
-                return (
-                  <div className="fixture-column" key={dateKey}>
-                    <div className="fixture-column__header">{dateKey}</div>
-                    {rows.length ? (
-                      <div className="fixture-mini">
-                        {rows.map((match, idx) => (
-                          <div key={match.id || `${dateKey}-${idx}`} className="fixture-mini__item">
-                            <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
-                            <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
-                            <div className="muted">{match.venue}</div>
-                            <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="muted">No fixtures for {dateKey}.</div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="filter-group fixture-date-picker">
+              <label className="label">Choose a date to see fixtures</label>
+              <select
+                className="input"
+                value={fixtureDateFilter}
+                onChange={(e) => setFixtureDateFilter(e.target.value)}
+              >
+                {fixtureDateOptions.map((dateKey) => (
+                  <option key={`fixture-date-${dateKey}`} value={dateKey}>
+                    {dateKey}
+                  </option>
+                ))}
+              </select>
             </div>
+            {fixturesForSelectedDate.length ? (
+              <div className="fixture-mini">
+                {fixturesForSelectedDate.map((match, idx) => (
+                  <div key={match.id || `${fixtureDateFilter || "selected"}-${idx}`} className="fixture-mini__item">
+                    <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
+                    <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
+                    <div className="muted">{match.venue}</div>
+                    <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="muted">No fixtures for {fixtureDateFilter || todayUtc()}.</div>
+            )}
           </div>
           <div className="muted formation-limits">
             Formation limits: min 3 batters, 3 bowlers, 1 wicket-keeper, 1 all-rounder. Max 5 batters, 5 bowlers, 4 wicket-keepers, 4 all-rounders.
@@ -1555,7 +1576,7 @@ export default function TeamBuilder() {
               </select>
             </div>
             <div className="filter-meta filter-meta--team muted">
-              Showing {filteredPlayers.length} of {players.length}
+              Showing {filteredPlayers.length} of {super8Players.length}
             </div>
           </div>
 
