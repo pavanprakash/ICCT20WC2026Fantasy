@@ -400,6 +400,30 @@ export default function TeamBuilder() {
     });
     return Array.from(set).sort();
   }, [fixturesAll]);
+
+  const fixtureDateWindow = useMemo(() => {
+    const start = todayUtc();
+    return [0, 1, 2].map((offset) => addUtcDays(start, offset));
+  }, [fixturesAll]);
+
+  const fixturesByWindowDate = useMemo(() => {
+    const byDate = new Map();
+    for (const dateKey of fixtureDateWindow) {
+      const rows = (fixturesAll || [])
+        .filter((m) => m.date === dateKey)
+        .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
+      if (rows.length) {
+        byDate.set(dateKey, rows);
+        continue;
+      }
+      const localRows = fixtures
+        .filter((m) => m.date === dateKey)
+        .map((m) => ({ ...m, timeGMT: m.timeGMT || m.time || null, statusLabel: "Scheduled" }))
+        .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
+      byDate.set(dateKey, localRows);
+    }
+    return byDate;
+  }, [fixtureDateWindow, fixturesAll]);
   useEffect(() => {
     let mounted = true;
     setDailyPoints((prev) => ({ ...prev, loading: true }));
