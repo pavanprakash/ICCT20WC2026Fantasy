@@ -7,6 +7,56 @@ function normalizeName(value) {
     .trim();
 }
 
+function normalizeTeamToken(value) {
+  const raw = String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
+  if (!raw) return "";
+  const map = {
+    AFG: "AFG",
+    AFGHANISTAN: "AFG",
+    AUS: "AUS",
+    AUSTRALIA: "AUS",
+    BAN: "BAN",
+    BANGLADESH: "BAN",
+    CAN: "CAN",
+    CANADA: "CAN",
+    ENG: "ENG",
+    ENGLAND: "ENG",
+    IND: "IND",
+    INDIA: "IND",
+    IRE: "IRE",
+    IRELAND: "IRE",
+    ITA: "ITA",
+    ITALY: "ITA",
+    NAM: "NAM",
+    NAMIBIA: "NAM",
+    NEP: "NEP",
+    NEPAL: "NEP",
+    NED: "NED",
+    NETHERLANDS: "NED",
+    NZ: "NZ",
+    NEWZEALAND: "NZ",
+    OMAN: "OMAN",
+    PAK: "PAK",
+    PAKISTAN: "PAK",
+    SA: "SA",
+    SOUTHAFRICA: "SA",
+    SCO: "SCO",
+    SCOTLAND: "SCO",
+    SL: "SL",
+    SRILANKA: "SL",
+    UAE: "UAE",
+    USA: "USA",
+    US: "USA",
+    WESTINDIES: "WI",
+    WI: "WI",
+    ZIM: "ZIM",
+    ZIMBABWE: "ZIM"
+  };
+  return map[raw] || raw;
+}
+
 function getPlayerNameById(players, idOrObj) {
   if (!idOrObj || !Array.isArray(players)) return null;
   const id = idOrObj?._id || idOrObj;
@@ -31,10 +81,10 @@ export function applySuperSubByLowest(submission, pointsDoc) {
   const playingXI = normalizePlayingXI(pointsDoc?.playingXI || []);
   const team1 = submission?.team1 || pointsDoc?.team1 || "";
   const team2 = submission?.team2 || pointsDoc?.team2 || "";
-  const team1Key = normalizeName(team1);
-  const team2Key = normalizeName(team2);
+  const team1Key = normalizeTeamToken(team1);
+  const team2Key = normalizeTeamToken(team2);
   const teamMatches = (p) => {
-    const country = normalizeName(p?.country || "");
+    const country = normalizeTeamToken(p?.country || "");
     return (team1Key && country === team1Key) || (team2Key && country === team2Key);
   };
   const hasTeamMatch = players.some(teamMatches);
@@ -52,17 +102,32 @@ export function applySuperSubByLowest(submission, pointsDoc) {
 
   const points = Array.isArray(pointsDoc?.points) ? pointsDoc.points : [];
   const baseMap = new Map(points.map((p) => [normalizeName(p.name), Number(p.total || 0)]));
+  const playingXISet = new Set(playingXI);
+  const eligible = players.filter((p) => {
+    const key = normalizeName(p?.name);
+    return key && teamMatches(p) && playingXISet.has(key);
+  });
 
-  let target = null;
-  let minPoints = Infinity;
-  for (const p of players) {
-    const key = normalizeName(p.name);
-    const base = baseMap.get(key) ?? 0;
-    if (base < minPoints) {
-      minPoints = base;
-      target = p;
-    }
+  if (!eligible.length) {
+    return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
   }
+
+  const eligibleWithBase = eligible.map((p) => ({
+    player: p,
+    key: normalizeName(p.name),
+    base: baseMap.get(normalizeName(p.name)) ?? 0
+  }));
+  const minPoints = Math.min(...eligibleWithBase.map((row) => row.base));
+  const minCandidates = eligibleWithBase.filter((row) => row.base === minPoints);
+  const capKey = normalizeName(effectiveCapName);
+  const vcKey = normalizeName(effectiveVcName);
+
+  // Tie-break priority: captain, then vice-captain, then first in submission order.
+  const chosen =
+    minCandidates.find((row) => capKey && row.key === capKey) ||
+    minCandidates.find((row) => vcKey && row.key === vcKey) ||
+    minCandidates[0];
+  const target = chosen?.player || null;
   if (!target) {
     return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
   }
@@ -72,8 +137,6 @@ export function applySuperSubByLowest(submission, pointsDoc) {
   nameSet.add(superKey);
   roleByName.set(superKey, superSub.role || roleByName.get(superKey) || "");
 
-  const capKey = normalizeName(effectiveCapName);
-  const vcKey = normalizeName(effectiveVcName);
   if (capKey && targetKey === capKey) {
     effectiveCapName = superSub.name;
   } else if (vcKey && targetKey === vcKey) {
