@@ -7,6 +7,53 @@ function normalizeName(value) {
     .trim();
 }
 
+function compactName(value) {
+  return normalizeName(value).replace(/\s+/g, "");
+}
+
+function isWithinOneEdit(a, b) {
+  if (a === b) return true;
+  const la = a.length;
+  const lb = b.length;
+  if (Math.abs(la - lb) > 1) return false;
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+  while (i < la && j < lb) {
+    if (a[i] === b[j]) {
+      i += 1;
+      j += 1;
+      continue;
+    }
+    edits += 1;
+    if (edits > 1) return false;
+    if (la > lb) i += 1;
+    else if (lb > la) j += 1;
+    else {
+      i += 1;
+      j += 1;
+    }
+  }
+  if (i < la || j < lb) edits += 1;
+  return edits <= 1;
+}
+
+function isApproxNameMatch(left, right) {
+  const a = compactName(left);
+  const b = compactName(right);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  // Allow minor provider spelling variance (e.g. chakaravarthy/chakravarthy).
+  return isWithinOneEdit(a, b);
+}
+
+function findApproxKey(candidates = [], target) {
+  const exact = candidates.find((value) => normalizeName(value) === normalizeName(target));
+  if (exact) return normalizeName(exact);
+  const near = candidates.find((value) => isApproxNameMatch(value, target));
+  return near ? normalizeName(near) : null;
+}
+
 function normalizeTeamToken(value) {
   const raw = String(value || "")
     .toUpperCase()
@@ -89,23 +136,30 @@ export function applySuperSubByLowest(submission, pointsDoc) {
   };
   const hasTeamMatch = players.some(teamMatches);
   const playingMatchesTeam = playingXI.some((name) =>
-    players.some((p) => normalizeName(p.name) === name && teamMatches(p))
+    players.some((p) => isApproxNameMatch(p.name, name) && teamMatches(p))
   );
   if (hasTeamMatch && !playingMatchesTeam) {
     return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
   }
 
   const superKey = normalizeName(superSub.name);
-  if (!superKey || !playingXI.includes(superKey)) {
+  const resolvedSuperKey = findApproxKey(playingXI, superSub.name) || superKey;
+  if (!superKey || !resolvedSuperKey || !playingXI.includes(resolvedSuperKey)) {
     return { nameSet, roleByName, capName: effectiveCapName, vcName: effectiveVcName, superSubUsed: false };
   }
 
   const points = Array.isArray(pointsDoc?.points) ? pointsDoc.points : [];
   const baseMap = new Map(points.map((p) => [normalizeName(p.name), Number(p.total || 0)]));
+  const pointKeys = Array.from(baseMap.keys());
+  for (const p of players) {
+    const matchedKey = findApproxKey(pointKeys, p?.name);
+    if (matchedKey) nameSet.add(matchedKey);
+  }
   const playingXISet = new Set(playingXI);
   const eligible = players.filter((p) => {
     const key = normalizeName(p?.name);
-    return key && teamMatches(p) && playingXISet.has(key);
+    const playingKey = findApproxKey(playingXI, p?.name) || key;
+    return key && teamMatches(p) && playingXISet.has(playingKey);
   });
 
   if (!eligible.length) {
@@ -134,8 +188,8 @@ export function applySuperSubByLowest(submission, pointsDoc) {
 
   const targetKey = normalizeName(target.name);
   nameSet.delete(targetKey);
-  nameSet.add(superKey);
-  roleByName.set(superKey, superSub.role || roleByName.get(superKey) || "");
+  nameSet.add(resolvedSuperKey);
+  roleByName.set(resolvedSuperKey, superSub.role || roleByName.get(resolvedSuperKey) || "");
 
   if (capKey && targetKey === capKey) {
     effectiveCapName = superSub.name;
