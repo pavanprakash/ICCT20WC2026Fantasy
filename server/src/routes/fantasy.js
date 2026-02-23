@@ -395,6 +395,7 @@ router.post("/points/since", authRequired, async (req, res) => {
 
 router.get("/submissions", authRequired, async (req, res) => {
   try {
+  const ruleset = DEFAULT_RULESET.name;
   const submissions = await TeamSubmission.find({ user: req.user.id })
     .populate("players")
     .populate("captain")
@@ -404,7 +405,7 @@ router.get("/submissions", authRequired, async (req, res) => {
     .lean();
 
     const matchIds = submissions.map((s) => s.matchId);
-  const pointsDocs = await FantasyMatchPoints.find({ matchId: { $in: matchIds } }).lean();
+  const pointsDocs = await FantasyMatchPoints.find({ matchId: { $in: matchIds }, ruleset }).lean();
   const pointsMap = new Map(pointsDocs.map((d) => [String(d.matchId), d]));
 
     const rows = submissions.map((s) => {
@@ -480,6 +481,7 @@ router.get("/submissions", authRequired, async (req, res) => {
 
 router.get("/submissions/:id", async (req, res) => {
   try {
+    const ruleset = DEFAULT_RULESET.name;
     const submission =
       (await TeamSubmission.findOne({ _id: req.params.id })
         .populate("players")
@@ -498,7 +500,7 @@ router.get("/submissions/:id", async (req, res) => {
       return res.status(404).json({ error: "Submission not found" });
     }
 
-    const pointsDoc = await FantasyMatchPoints.findOne({ matchId: submission.matchId }).lean();
+    const pointsDoc = await FantasyMatchPoints.findOne({ matchId: submission.matchId, ruleset }).lean();
     const points = Array.isArray(pointsDoc?.points) ? pointsDoc.points : [];
     const applied = applySuperSub(submission, pointsDoc);
     const boosterPlayerName = getPlayerNameById(submission.players, submission.boosterPlayer);
