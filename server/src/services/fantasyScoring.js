@@ -1,3 +1,5 @@
+import { normalizeNameKey } from "../utils/nameCanonical.js";
+
 export const DEFAULT_RULESET = {
   name: "ICC_T20_2026",
   batting: {
@@ -116,6 +118,10 @@ function normalizeName(entry) {
   return String(name).trim();
 }
 
+function canonicalName(value) {
+  return normalizeNameKey(value);
+}
+
 function battingPoints(entry, rules, options = {}) {
   const runs = toNumber(entry.runs ?? entry.r ?? entry.score);
   const balls = toNumber(entry.balls ?? entry.b);
@@ -206,9 +212,15 @@ function fieldingPoints(entry, rules) {
 
 function addPointsToMap(map, name, bucket, points) {
   if (!name || !points) return;
-  const current = map.get(name) || { name, batting: 0, bowling: 0, fielding: 0 };
+  const key = canonicalName(name);
+  if (!key) return;
+  const current = map.get(key) || { name, batting: 0, bowling: 0, fielding: 0 };
+  // Prefer a richer display label if variants exist (e.g., "J Archer" vs "Jofra Archer").
+  if (String(name).length > String(current.name || "").length) {
+    current.name = name;
+  }
   current[bucket] += points;
-  map.set(name, current);
+  map.set(key, current);
 }
 
 function parseRunoutFielders(entry) {
@@ -303,11 +315,15 @@ export function applyPlayingXIPoints(
   substituteBonus = Number(DEFAULT_RULESET?.additional?.playingSubstitute ?? 4)
 ) {
   const list = Array.isArray(points) ? points.map((p) => ({ ...p })) : [];
-  const lookup = new Map(list.map((p) => [normalizeName(p.name), p]));
+  const lookup = new Map(
+    list
+      .map((p) => [canonicalName(p.name), p])
+      .filter(([k]) => Boolean(k))
+  );
   const xi = Array.isArray(playingXI) ? playingXI : [];
   const substitutes = Array.isArray(playingSubstitutes) ? playingSubstitutes : [];
   xi.forEach((name) => {
-    const key = normalizeName(name);
+    const key = canonicalName(name);
     if (!key) return;
     const current = lookup.get(key);
     if (current) {
@@ -320,9 +336,9 @@ export function applyPlayingXIPoints(
     }
   });
 
-  const xiKeys = new Set(xi.map((name) => normalizeName(name)).filter(Boolean));
+  const xiKeys = new Set(xi.map((name) => canonicalName(name)).filter(Boolean));
   substitutes.forEach((name) => {
-    const key = normalizeName(name);
+    const key = canonicalName(name);
     if (!key || xiKeys.has(key)) return;
     const current = lookup.get(key);
     if (current) {
