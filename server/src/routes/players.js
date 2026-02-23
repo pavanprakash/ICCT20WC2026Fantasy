@@ -1,6 +1,7 @@
 import express from "express";
 import Player from "../models/Player.js";
 import FantasyMatchPoints from "../models/FantasyMatchPoints.js";
+import { normalizeNameKey } from "../utils/nameCanonical.js";
 
 const router = express.Router();
 
@@ -8,10 +9,7 @@ const CACHE_TTL_MS = 60 * 1000;
 let pointsCache = { expiresAt: 0, totals: new Map() };
 
 function normalizeName(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return normalizeNameKey(value);
 }
 
 function calcPoints(player) {

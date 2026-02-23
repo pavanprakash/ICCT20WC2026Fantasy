@@ -8,6 +8,7 @@ import fixtures from "../data/fixtures-2026.js";
 import { cricapiGet } from "../services/cricapi.js";
 import { authRequired } from "../middleware/auth.js";
 import { applySuperSubByLowest } from "../services/superSub.js";
+import { normalizeNameKey } from "../utils/nameCanonical.js";
 
 const router = express.Router();
 
@@ -23,10 +24,7 @@ function teamPoints(players) {
 }
 
 function normalizeName(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return normalizeNameKey(value);
 }
 
 function getPlayerNameById(players, idOrObj) {
@@ -144,6 +142,24 @@ function roundKey() {
 function diffTransfers(oldIds, newIds) {
   const oldSet = new Set(oldIds.map(String));
   return newIds.filter((id) => !oldSet.has(String(id))).length;
+}
+
+function clampNonNegative(num) {
+  return Math.max(0, Number(num || 0));
+}
+
+async function getBaselinePlayersBeforeFixture(userId, nextMatchId, nextMatchStartMs, fallbackPlayers = []) {
+  if (!Number.isFinite(nextMatchStartMs)) return fallbackPlayers || [];
+  const previous = await TeamSubmission.findOne({
+    user: userId,
+    matchId: { $ne: nextMatchId },
+    matchStartMs: { $lt: nextMatchStartMs }
+  })
+    .sort({ matchStartMs: -1, updatedAt: -1, createdAt: -1 })
+    .select("players")
+    .lean();
+  if (Array.isArray(previous?.players) && previous.players.length) return previous.players;
+  return fallbackPlayers || [];
 }
 
 const GROUP_LIMIT = 120;
@@ -621,6 +637,14 @@ router.post("/", authRequired, async (req, res) => {
   const member = await League.exists({ members: req.user.id });
 
   if (existing) {
+    const existingSubmissionForUpcoming = await TeamSubmission.findOne({
+      user: req.user.id,
+      matchId: window.nextMatch.id
+    })
+      .select("transferCost")
+      .lean();
+    let transferCostForThisSubmission = Number(existingSubmissionForUpcoming?.transferCost || 0);
+
     if (!existing.lockedInLeague && member) {
       existing.lockedInLeague = true;
     }
@@ -631,6 +655,7 @@ router.post("/", authRequired, async (req, res) => {
     if (existing.lockedInLeague) {
       if (inFirstSubmissionWindow) {
         // Free changes before the first submitted match starts; no transfers counted.
+        transferCostForThisSubmission = 0;
       } else if (phase === "SUPER8_PRE") {
         // Unlimited transfers before first Super 8 fixture starts.
         if (!existing.postGroupResetDone) {
@@ -640,6 +665,7 @@ router.post("/", authRequired, async (req, res) => {
         }
         existing.transfersLimit = SUPER8_LIMIT;
         existing.transferPhase = "SUPER8_PRE";
+        transferCostForThisSubmission = 0;
       } else {
         if (phase === "SUPER8" && !existing.postGroupResetDone) {
           existing.transfersUsedTotal = 0;
@@ -649,10 +675,26 @@ router.post("/", authRequired, async (req, res) => {
         const limit = phase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT;
         existing.transfersLimit = limit;
         existing.transferPhase = phase;
-
-        const transfersThisAction = diffTransfers(existing.players || [], uniqueIds);
+        const sameUpcomingFixture =
+          Boolean(existing.submittedForMatchId) && String(existing.submittedForMatchId) === String(window.nextMatch.id);
+        const previousCost = Number(existingSubmissionForUpcoming?.transferCost || 0);
+        let transfersDelta = 0;
+        if (sameUpcomingFixture) {
+          const baselinePlayers = await getBaselinePlayersBeforeFixture(
+            req.user.id,
+            window.nextMatch.id,
+            Number(window.nextMatch.startMs),
+            existing.players || []
+          );
+          transferCostForThisSubmission = diffTransfers(baselinePlayers || [], uniqueIds);
+          transfersDelta = transferCostForThisSubmission - previousCost;
+        } else {
+          const transfersThisAction = diffTransfers(existing.players || [], uniqueIds);
+          transferCostForThisSubmission = transfersThisAction;
+          transfersDelta = transfersThisAction;
+        }
         const used = existing.transfersUsedTotal ?? 0;
-        if (used + transfersThisAction > limit) {
+        if (used + transfersDelta > limit) {
           return res.status(400).json({
             error: "You have maxed out the number of allowed transfers for this round!"
           });
@@ -660,13 +702,14 @@ router.post("/", authRequired, async (req, res) => {
         const key = roundKey();
         const byRound = existing.transfersByRound || {};
         const current = Number(byRound.get ? byRound.get(key) : byRound[key] || 0) || 0;
+        const nextRoundValue = clampNonNegative(current + transfersDelta);
         if (byRound.set) {
-          byRound.set(key, current + transfersThisAction);
+          byRound.set(key, nextRoundValue);
         } else {
-          byRound[key] = current + transfersThisAction;
+          byRound[key] = nextRoundValue;
         }
         existing.transfersByRound = byRound;
-        existing.transfersUsedTotal = used + transfersThisAction;
+        existing.transfersUsedTotal = clampNonNegative(used + transfersDelta);
       }
     }
 
@@ -710,6 +753,7 @@ router.post("/", authRequired, async (req, res) => {
         team1: clientNextMatch?.team1 || null,
         team2: clientNextMatch?.team2 || null,
         venue: clientNextMatch?.venue || null,
+        transferCost: transferCostForThisSubmission,
         players: uniqueIds,
         booster: boosterType,
         boosterPlayer: boosterType === "captainx3" ? boosterPlayerId : null,
@@ -782,6 +826,7 @@ router.post("/", authRequired, async (req, res) => {
       team1: clientNextMatch?.team1 || null,
       team2: clientNextMatch?.team2 || null,
       venue: clientNextMatch?.venue || null,
+      transferCost: 0,
       players: uniqueIds,
       booster: boosterType,
       boosterPlayer: boosterType === "captainx3" ? boosterPlayerId : null,

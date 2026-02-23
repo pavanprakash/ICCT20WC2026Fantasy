@@ -6,6 +6,7 @@ import Player from "../models/Player.js";
 import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
 import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
 import { getPlayingSubstitutes, getPlayingXI } from "../services/playingXI.js";
+import { normalizeNameKey } from "../utils/nameCanonical.js";
 
 dotenv.config();
 
@@ -15,10 +16,7 @@ const SERIES_KEY = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
 const SCORECARD_KEY = SERIES_KEY;
 
 function normalizeName(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return normalizeNameKey(value);
 }
 
 function buildRoleMap(players = []) {

@@ -54,6 +54,49 @@ const TEAM_NAME_MAP = {
   WI: "West Indies",
   ZIM: "Zimbabwe"
 };
+const TEAM_TOKEN_MAP = {
+  AFG: "AFG",
+  AFGHANISTAN: "AFG",
+  AUS: "AUS",
+  AUSTRALIA: "AUS",
+  BAN: "BAN",
+  BANGLADESH: "BAN",
+  CAN: "CAN",
+  CANADA: "CAN",
+  ENG: "ENG",
+  ENGLAND: "ENG",
+  IND: "IND",
+  INDIA: "IND",
+  IRE: "IRE",
+  IRELAND: "IRE",
+  ITA: "ITA",
+  ITALY: "ITA",
+  NAM: "NAM",
+  NAMIBIA: "NAM",
+  NEP: "NEP",
+  NEPAL: "NEP",
+  NED: "NED",
+  NETHERLANDS: "NED",
+  NZ: "NZ",
+  NEWZEALAND: "NZ",
+  OMAN: "OMAN",
+  PAK: "PAK",
+  PAKISTAN: "PAK",
+  SA: "SA",
+  RSA: "SA",
+  SOUTHAFRICA: "SA",
+  SCO: "SCO",
+  SCOTLAND: "SCO",
+  SL: "SL",
+  SRILANKA: "SL",
+  UAE: "UAE",
+  USA: "USA",
+  US: "USA",
+  WI: "WI",
+  WESTINDIES: "WI",
+  ZIM: "ZIM",
+  ZIMBABWE: "ZIM"
+};
 const formatPrice = (value) => Number(value || 0).toFixed(1);
 const todayUtc = () => {
   const now = new Date();
@@ -103,6 +146,68 @@ const hasConcreteTeams = (match) => {
     isPlaceholderTeam(match?.team1) &&
     isPlaceholderTeam(match?.team2)
   );
+};
+
+const normalizeTeamToken = (value) => {
+  const raw = String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
+  return TEAM_TOKEN_MAP[raw] || raw || "UNK";
+};
+
+const fixtureDedupeKey = (match) => {
+  return [
+    String(match?.date || ""),
+    String(match?.timeGMT || match?.time || ""),
+    normalizeTeamToken(match?.team1),
+    normalizeTeamToken(match?.team2)
+  ].join("|");
+};
+
+const fixtureTeamDayKey = (match) => {
+  return [
+    String(match?.date || ""),
+    normalizeTeamToken(match?.team1),
+    normalizeTeamToken(match?.team2)
+  ].join("|");
+};
+
+const fixtureQualityScore = (match) => {
+  let score = 0;
+  if (hasConcreteTeams(match)) score += 5;
+  if (String(match?.venue || "").trim()) score += 2;
+  if (String(match?.statusLabel || match?.status || "").trim()) score += 1;
+  return score;
+};
+
+const fixtureTimeValue = (match) => {
+  const raw = String(match?.timeGMT || match?.time || "");
+  const [h, m] = raw.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return Number.POSITIVE_INFINITY;
+  return h * 60 + m;
+};
+
+const preferFixture = (current, incoming) => {
+  const currentScore = fixtureQualityScore(current);
+  const incomingScore = fixtureQualityScore(incoming);
+  if (incomingScore !== currentScore) return incomingScore > currentScore ? incoming : current;
+  return fixtureTimeValue(incoming) < fixtureTimeValue(current) ? incoming : current;
+};
+
+const dedupeFixtures = (rows, keyFactory) => {
+  const out = [];
+  const index = new Map();
+  for (const row of rows) {
+    const key = keyFactory(row);
+    if (!index.has(key)) {
+      index.set(key, out.length);
+      out.push(row);
+      continue;
+    }
+    const idx = index.get(key);
+    out[idx] = preferFixture(out[idx], row);
+  }
+  return out;
 };
 
 const pickTeamName = (localValue, apiValue) => {
@@ -165,7 +270,10 @@ const mergeFixturesWithLocal = (apiMatches = []) => {
     }
   }
 
-  return merged.sort((a, b) => `${a.date || ""}${a.timeGMT || ""}`.localeCompare(`${b.date || ""}${b.timeGMT || ""}`));
+  const dedupedByTime = dedupeFixtures(merged, fixtureDedupeKey);
+  const deduped = dedupeFixtures(dedupedByTime, fixtureTeamDayKey);
+
+  return deduped.sort((a, b) => `${a.date || ""}${a.timeGMT || ""}`.localeCompare(`${b.date || ""}${b.timeGMT || ""}`));
 };
 
 const computeMatchWindow = (matches) => {
@@ -447,8 +555,10 @@ export default function TeamBuilder() {
       const rows = (fixturesAll || [])
         .filter((m) => m.date === dateKey)
         .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
-      if (rows.length) {
-        byDate.set(dateKey, rows);
+      const dedupedRows = dedupeFixtures(rows, fixtureTeamDayKey)
+        .sort((a, b) => String(a.timeGMT || a.time || "").localeCompare(String(b.timeGMT || b.time || "")));
+      if (dedupedRows.length) {
+        byDate.set(dateKey, dedupedRows);
         continue;
       }
       const localRows = fixtures

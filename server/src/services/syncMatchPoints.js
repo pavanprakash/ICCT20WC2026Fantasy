@@ -4,12 +4,10 @@ import Player from "../models/Player.js";
 import { cricapiGet, cricapiGetScorecardSafe } from "./cricapi.js";
 import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "./fantasyScoring.js";
 import { getPlayingSubstitutes, getPlayingXI } from "./playingXI.js";
+import { normalizeNameKey } from "../utils/nameCanonical.js";
 
 function normalizeName(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return normalizeNameKey(value);
 }
 
 function buildRoleMap(players = []) {

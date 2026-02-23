@@ -9,16 +9,14 @@ import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
 import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
 import { getPlayingSubstitutes, getPlayingXI } from "../services/playingXI.js";
 import { applySuperSubByLowest } from "../services/superSub.js";
+import { normalizeNameKey } from "../utils/nameCanonical.js";
 
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
 const SERIES_KEY = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
 const SCORECARD_KEY = process.env.CRICAPI_SCORECARD_KEY || process.env.CRICAPI_KEY;
 
 function normalizeName(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return normalizeNameKey(value);
 }
 
 function buildRoleMap(players = []) {
