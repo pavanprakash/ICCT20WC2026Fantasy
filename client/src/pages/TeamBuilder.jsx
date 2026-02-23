@@ -155,20 +155,23 @@ const normalizeTeamToken = (value) => {
   return TEAM_TOKEN_MAP[raw] || raw || "UNK";
 };
 
+const canonicalTeamPair = (team1, team2) => {
+  const pair = [normalizeTeamToken(team1), normalizeTeamToken(team2)].sort();
+  return `${pair[0]}|${pair[1]}`;
+};
+
 const fixtureDedupeKey = (match) => {
   return [
     String(match?.date || ""),
     String(match?.timeGMT || match?.time || ""),
-    normalizeTeamToken(match?.team1),
-    normalizeTeamToken(match?.team2)
+    canonicalTeamPair(match?.team1, match?.team2)
   ].join("|");
 };
 
 const fixtureTeamDayKey = (match) => {
   return [
     String(match?.date || ""),
-    normalizeTeamToken(match?.team1),
-    normalizeTeamToken(match?.team2)
+    canonicalTeamPair(match?.team1, match?.team2)
   ].join("|");
 };
 
