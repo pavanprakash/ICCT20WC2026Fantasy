@@ -5,7 +5,7 @@ import Player from "../models/Player.js";
 import Team from "../models/Team.js";
 import TeamSubmission from "../models/TeamSubmission.js";
 import { authRequired } from "../middleware/auth.js";
-import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
+import { cricapiGet } from "../services/cricapi.js";
 import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
 import { getPlayingSubstitutes, getPlayingXI } from "../services/playingXI.js";
 import { applySuperSubByLowest } from "../services/superSub.js";
@@ -236,7 +236,10 @@ router.post("/sync", async (req, res) => {
     for (const match of matches) {
       const matchId = match?.id || match?.match_id || match?.matchId || match?.unique_id;
       if (!matchId) continue;
-      const safe = await cricapiGetScorecardSafe(matchId, SCORECARD_KEY);
+      const safe = await cricapiGetScorecardSafe(
+        matchId,
+        SCORECARD_KEY
+      );
       if (safe.skipped) {
         console.warn(
           JSON.stringify({
