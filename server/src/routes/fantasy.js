@@ -5,7 +5,7 @@ import Player from "../models/Player.js";
 import Team from "../models/Team.js";
 import TeamSubmission from "../models/TeamSubmission.js";
 import { authRequired } from "../middleware/auth.js";
-import { cricapiGet } from "../services/cricapi.js";
+import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
 import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
 import { getPlayingSubstitutes, getPlayingXI } from "../services/playingXI.js";
 import { applySuperSubByLowest } from "../services/superSub.js";
@@ -69,6 +69,10 @@ function totalWithCaptaincy(points, captainName, viceName, boosterType, roleByNa
 }
 
 const applySuperSub = applySuperSubByLowest;
+const SCORECARD_KEY =
+  process.env.CRICAPI_SCORECARD_KEY ||
+  process.env.CRICAPI_SERIES_KEY ||
+  process.env.CRICAPI_KEY;
 
 function isCompletedMatch(match) {
   const ms = String(match?.ms || "").toLowerCase();
@@ -142,7 +146,7 @@ router.get("/score/:matchId", async (req, res) => {
     const playerRoleByName = buildRoleMap(await Player.find({}).select("name role").lean());
 
     const { matchId } = req.params;
-    const safe = await cricapiGetScorecardSafe(matchId);
+    const safe = await cricapiGetScorecardSafe(matchId, SCORECARD_KEY);
     if (safe.skipped) {
       console.warn(
         JSON.stringify({
@@ -232,10 +236,7 @@ router.post("/sync", async (req, res) => {
     for (const match of matches) {
       const matchId = match?.id || match?.match_id || match?.matchId || match?.unique_id;
       if (!matchId) continue;
-      const safe = await cricapiGetScorecardSafe(
-        matchId,
-        process.env.CRICAPI_SCORECARD_KEY || process.env.CRICAPI_KEY
-      );
+      const safe = await cricapiGetScorecardSafe(matchId, SCORECARD_KEY);
       if (safe.skipped) {
         console.warn(
           JSON.stringify({
