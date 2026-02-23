@@ -162,7 +162,11 @@ router.get("/score/:matchId", async (req, res) => {
         reason: safe.reason || "unavailable"
       });
     }
-    const scoreRoot = safe.data?.data;
+    const scoreRoot =
+      safe.data?.data ||
+      safe.data?.scorecard ||
+      safe.data?.innings ||
+      safe.data;
     const scorecard = scoreRoot?.scorecard || scoreRoot?.innings || scoreRoot;
     const playingXI = getPlayingXI(scoreRoot);
     const playingSubstitutes = getPlayingSubstitutes(scoreRoot, playingXI);
@@ -242,7 +246,11 @@ router.post("/sync", async (req, res) => {
         );
         continue;
       }
-      const scoreRoot = safe.data?.data;
+      const scoreRoot =
+        safe.data?.data ||
+        safe.data?.scorecard ||
+        safe.data?.innings ||
+        safe.data;
       if (!isCompletedMatch(match) && !isCompletedScorecard(scoreRoot)) {
         continue;
       }
