@@ -118,8 +118,18 @@ function inferFromInnings(scoreRoot) {
 
 export function getPlayingXI(scoreRoot) {
   const direct = extractPlayingXIFields(scoreRoot);
-  if (direct.length) return direct;
-  return inferFromInnings(scoreRoot);
+  const inferred = inferFromInnings(scoreRoot);
+  if (!direct.length) return inferred;
+  // Some providers return partial playing XI; merge with participants seen in innings.
+  const merged = [...direct];
+  const seen = new Set(merged.map((n) => normalizeName(n)).filter(Boolean));
+  for (const name of inferred) {
+    const key = normalizeName(name);
+    if (!key || seen.has(key)) continue;
+    merged.push(name);
+    seen.add(key);
+  }
+  return merged;
 }
 
 export function getPlayingSubstitutes(scoreRoot, playingXI = []) {
