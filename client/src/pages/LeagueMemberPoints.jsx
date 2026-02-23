@@ -69,6 +69,7 @@ export default function LeagueMemberPoints() {
           {rows.map((row) => {
             const fixture = row.matchName || (row.team1 && row.team2 ? `${row.team1} vs ${row.team2}` : "TBD");
             const when = row.matchStartMs || row.matchDate;
+            const showSuperSubTag = Boolean(row.superSubUsed || row.superSub);
             return (
               <div className="table__row" key={row.id}>
                 <span>{formatDate(when)}</span>
@@ -80,7 +81,11 @@ export default function LeagueMemberPoints() {
                     {row.totalPoints}
                   </Link>
                   {row.booster ? <span className="booster-flag">Booster</span> : null}
-                  {row.superSubUsed ? <span className="booster-flag booster-flag--sub">Super Sub</span> : null}
+                  {showSuperSubTag ? (
+                    <span className="booster-flag booster-flag--sub">
+                      {row.superSubUsed ? "Super Sub Used" : "Super Sub"}
+                    </span>
+                  ) : null}
                 </span>
               </div>
             );
