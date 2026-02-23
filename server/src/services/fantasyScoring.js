@@ -91,7 +91,9 @@ function getBowlingEntries(innings) {
 }
 
 function getFieldingEntries(innings) {
-  return innings?.fielding || [];
+  const fielding = Array.isArray(innings?.fielding) ? innings.fielding : [];
+  const catching = Array.isArray(innings?.catching) ? innings.catching : [];
+  return [...fielding, ...catching];
 }
 
 function normalizeName(entry) {

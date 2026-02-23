@@ -111,6 +111,7 @@ function inferFromInnings(scoreRoot) {
     addEntries(inn?.batting || inn?.batsmen || inn?.battingScorecard);
     addEntries(inn?.bowling || inn?.bowlers || inn?.bowlingScorecard);
     addEntries(inn?.fielding);
+    addEntries(inn?.catching);
   });
   return Array.from(names);
 }
