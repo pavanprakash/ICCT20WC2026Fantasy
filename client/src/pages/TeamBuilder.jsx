@@ -1304,9 +1304,6 @@ export default function TeamBuilder() {
           {showSuper8PreNotice ? (
             <div className="notice">You are allowed to make unlimited transfers before the start of first Super 8 fixture.</div>
           ) : null}
-          {superSubUsage?.used ? (
-            <div className="notice">Super Sub already used against {superSubUsage.fixtureName}; it will be carried over to the next fixture today.</div>
-          ) : null}
           {superSubTempDisabled ? (
             <div className="notice">Super Sub is temporarily disabled for this fixture.</div>
           ) : null}
