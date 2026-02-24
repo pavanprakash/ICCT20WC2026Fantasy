@@ -26,11 +26,47 @@ const canOpenPoints = (row) => {
   return Date.now() >= startMs + MATCH_DURATION_MS;
 };
 
+const TEAM_CODE_MAP = {
+  AFGHANISTAN: "AFG",
+  AUSTRALIA: "AUS",
+  BANGLADESH: "BAN",
+  CANADA: "CAN",
+  ENGLAND: "ENG",
+  INDIA: "IND",
+  IRELAND: "IRE",
+  ITALY: "ITA",
+  NAMIBIA: "NAM",
+  NEPAL: "NEP",
+  NETHERLANDS: "NED",
+  "NEW ZEALAND": "NZ",
+  OMAN: "OMN",
+  PAKISTAN: "PAK",
+  SCOTLAND: "SCO",
+  "SOUTH AFRICA": "SA",
+  "SRI LANKA": "SL",
+  UAE: "UAE",
+  USA: "USA",
+  "WEST INDIES": "WI",
+  ZIMBABWE: "ZIM"
+};
+
+const shortTeam = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "TBD";
+  const upper = raw.toUpperCase();
+  if (upper.length <= 3) return upper;
+  if (TEAM_CODE_MAP[upper]) return TEAM_CODE_MAP[upper];
+  return upper.replace(/[^A-Z]/g, "").slice(0, 3) || "TBD";
+};
+
 const simpleFixture = (row) => {
-  if (row?.team1 && row?.team2) return `${row.team1} v ${row.team2}`;
+  if (row?.team1 && row?.team2) return `${shortTeam(row.team1)} v ${shortTeam(row.team2)}`;
   const raw = String(row?.matchName || "").trim();
   if (!raw) return "TBD";
-  return raw.split(",")[0] || raw;
+  const first = raw.split(",")[0] || raw;
+  const parts = first.split(/\s+v(?:s)?\s+/i);
+  if (parts.length === 2) return `${shortTeam(parts[0])} v ${shortTeam(parts[1])}`;
+  return first;
 };
 
 export default function ViewPoints() {

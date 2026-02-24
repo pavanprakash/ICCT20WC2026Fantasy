@@ -548,9 +548,9 @@ export default function TeamBuilder() {
   }, [fixturesAll]);
 
   const fixtureDateWindow = useMemo(() => {
-    const start = todayUtc();
+    const start = fixtureDateFilter || todayUtc();
     return [0, 1, 2].map((offset) => addUtcDays(start, offset));
-  }, [fixturesAll]);
+  }, [fixtureDateFilter]);
 
   const fixturesByWindowDate = useMemo(() => {
     const byDate = new Map();
