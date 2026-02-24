@@ -26,6 +26,13 @@ const canOpenPoints = (row) => {
   return Date.now() >= startMs + MATCH_DURATION_MS;
 };
 
+const simpleFixture = (row) => {
+  if (row?.team1 && row?.team2) return `${row.team1} v ${row.team2}`;
+  const raw = String(row?.matchName || "").trim();
+  if (!raw) return "TBD";
+  return raw.split(",")[0] || raw;
+};
+
 export default function ViewPoints() {
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -71,7 +78,7 @@ export default function ViewPoints() {
             <span>Points</span>
           </div>
           {rows.map((row) => {
-            const fixture = row.matchName || (row.team1 && row.team2 ? `${row.team1} vs ${row.team2}` : "TBD");
+            const fixture = simpleFixture(row);
             const when = row.matchStartMs || row.matchDate;
             const showCaptainTags = Boolean(row.booster) && row.booster !== "captainx3";
             const showSuperSubTag = Boolean(row.superSubUsed || row.superSub);

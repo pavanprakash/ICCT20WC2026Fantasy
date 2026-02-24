@@ -26,6 +26,13 @@ const canOpenPoints = (row) => {
   return Date.now() >= startMs + MATCH_DURATION_MS;
 };
 
+const simpleFixture = (row) => {
+  if (row?.team1 && row?.team2) return `${row.team1} v ${row.team2}`;
+  const raw = String(row?.matchName || "").trim();
+  if (!raw) return "TBD";
+  return raw.split(",")[0] || raw;
+};
+
 export default function LeagueMemberPoints() {
   const { id, userId } = useParams();
   const [rows, setRows] = useState([]);
@@ -77,7 +84,7 @@ export default function LeagueMemberPoints() {
             <span>Points</span>
           </div>
           {rows.map((row) => {
-            const fixture = row.matchName || (row.team1 && row.team2 ? `${row.team1} vs ${row.team2}` : "TBD");
+            const fixture = simpleFixture(row);
             const when = row.matchStartMs || row.matchDate;
             const showSuperSubTag = Boolean(row.superSubUsed || row.superSub);
             const clickable = canOpenPoints(row);
