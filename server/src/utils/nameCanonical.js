@@ -1,5 +1,6 @@
 const NAME_ALIASES = {
-  "varun chakaravarthy": "varun chakravarthy"
+  "varun chakaravarthy": "varun chakravarthy",
+  "philip salt": "phil salt"
 };
 
 export function normalizeNameKey(value) {
@@ -9,4 +10,3 @@ export function normalizeNameKey(value) {
     .trim();
   return NAME_ALIASES[key] || key;
 }
-
