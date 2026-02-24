@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api.js";
 
+const MATCH_DURATION_MS = 4 * 60 * 60 * 1000;
+
 const formatDate = (value) => {
   if (!value) return "TBD";
   const dt = new Date(value);
@@ -14,6 +16,14 @@ const formatTime = (value) => {
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return "TBD";
   return dt.toLocaleTimeString();
+};
+
+const canOpenPoints = (row) => {
+  const total = Number(row?.totalPoints || 0);
+  if (total > 0) return true;
+  const startMs = Number(row?.matchStartMs || 0);
+  if (!Number.isFinite(startMs) || startMs <= 0) return false;
+  return Date.now() >= startMs + MATCH_DURATION_MS;
 };
 
 export default function ViewPoints() {
@@ -65,6 +75,7 @@ export default function ViewPoints() {
             const when = row.matchStartMs || row.matchDate;
             const showCaptainTags = Boolean(row.booster) && row.booster !== "captainx3";
             const showSuperSubTag = Boolean(row.superSubUsed || row.superSub);
+            const clickable = canOpenPoints(row);
             return (
               <div className="table__row" key={row.id}>
                 <span>{formatDate(when)}</span>
@@ -81,9 +92,13 @@ export default function ViewPoints() {
                 </span>
                 <span>{row.venue || "TBD"}</span>
                 <span>
-                  <Link to={`/points/${row.id}`} className="link link--points">
-                    {row.totalPoints}
-                  </Link>
+                  {clickable ? (
+                    <Link to={`/points/${row.id}`} className="link link--points">
+                      {row.totalPoints}
+                    </Link>
+                  ) : (
+                    <span>{row.totalPoints}</span>
+                  )}
                   {row.booster ? <span className="booster-flag">Booster</span> : null}
                   {showSuperSubTag ? (
                     <span className="booster-flag booster-flag--sub">
