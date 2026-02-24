@@ -358,7 +358,7 @@ export default function TeamBuilder() {
           setCaptainId(t.data.captain ? String(t.data.captain) : "");
           setViceCaptainId(t.data.viceCaptain ? String(t.data.viceCaptain) : "");
           setBoosterPlayerId(t.data.boosterPlayer ? String(t.data.boosterPlayer) : "");
-          setSuperSubId(t.data.superSub ? String(t.data.superSub) : "");
+          setSuperSubId("");
           setSavedTeam({
             players: t.data.players.map((pl) => pl._id),
             captainId: t.data.captain ? String(t.data.captain) : "",
@@ -1025,7 +1025,7 @@ export default function TeamBuilder() {
   }, [submissionHistory, nextMatch?.date]);
   const superSubTempDisabled = Boolean(TEMP_SUPER_SUB_DISABLED_MATCH_ID) &&
     String(nextMatch?.id || "") === TEMP_SUPER_SUB_DISABLED_MATCH_ID;
-  const superSubDisabled = boosterDisabled || Boolean(superSubUsage?.used) || superSubTempDisabled;
+  const superSubDisabled = boosterDisabled || superSubTempDisabled;
   const boosterLabel = (type) => {
     switch (type) {
       case "batsman":
