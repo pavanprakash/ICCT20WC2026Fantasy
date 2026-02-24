@@ -18,6 +18,7 @@
     "backfill:first-submit": "node src/scripts/backfillFirstSubmittedMatchStart.js",
     "backfill:boosters": "node src/scripts/backfillUsedBoosters.js",
     "backfill:playing-xi": "node src/scripts/backfillPlayingXI.js",
+    "audit:names": "node src/scripts/auditNameMismatches.js",
     "auto-submit:match": "node src/scripts/autoSubmitMatch.js",
     "auto-submit:fix-match": "node src/scripts/fixAutoSubmissionsForMatch.js"
   },
