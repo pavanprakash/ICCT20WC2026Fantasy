@@ -291,7 +291,7 @@ async function getSeriesMatches() {
   const key = process.env.CRICAPI_SERIES_KEY || process.env.CRICAPI_KEY;
   const data = await cricapiGet("/cricScore", {}, key);
   const list = Array.isArray(data?.data) ? data.data : [];
-  return list
+  const matches = list
     .filter(isTargetMatch)
     .filter((m) => {
       const ms = normalize(m?.ms || m?.matchStatus || m?.status || "");
@@ -300,6 +300,26 @@ async function getSeriesMatches() {
     .map(parseMatchStart)
     .filter((m) => m && m.id && Number.isFinite(m.startMs))
     .sort((a, b) => a.startMs - b.startMs);
+
+  // Some /cricScore rows can carry stale/mismatched team labels for a valid match id.
+  // Reconcile teams/name from /match_info for each id to keep fixture mapping accurate.
+  const reconciled = await Promise.all(
+    matches.map(async (m) => {
+      try {
+        const info = await cricapiGet("/match_info", { id: m.id }, key);
+        const infoData = info?.data || {};
+        const infoTeams = parseTeams(infoData);
+        const team1 = firstText(infoTeams.team1, m.team1);
+        const team2 = firstText(infoTeams.team2, m.team2);
+        const fallbackName = team1 && team2 ? `${team1} v ${team2}` : m.name;
+        const name = firstText(infoData?.name, fallbackName);
+        return { ...m, team1, team2, name };
+      } catch {
+        return m;
+      }
+    })
+  );
+  return reconciled;
 }
 
 router.get("/upcoming", async (req, res) => {
