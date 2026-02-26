@@ -1027,7 +1027,16 @@ export default function TeamBuilder() {
     const fixtureName = used.matchName || (used.team1 && used.team2 ? `${used.team1} vs ${used.team2}` : "this fixture");
     return { used: true, fixtureName, matchId: used.matchId };
   }, [submissionHistory, nextMatch?.date]);
-  const superSubAlreadyUsedToday = Boolean(superSubUsage?.used);
+  const superSubLockedByTeamMeta = useMemo(() => {
+    if (!nextMatch?.date) return false;
+    if (!teamMeta?.superSub) return false;
+    if (!teamMeta?.submittedForDate) return false;
+    return (
+      String(teamMeta.submittedForDate) === String(nextMatch.date) &&
+      String(teamMeta.submittedForMatchId || "") !== String(nextMatch.id || "")
+    );
+  }, [teamMeta?.superSub, teamMeta?.submittedForDate, teamMeta?.submittedForMatchId, nextMatch?.date, nextMatch?.id]);
+  const superSubAlreadyUsedToday = Boolean(superSubUsage?.used || superSubLockedByTeamMeta);
   const superSubTempDisabled = Boolean(TEMP_SUPER_SUB_DISABLED_MATCH_ID) &&
     String(nextMatch?.id || "") === TEMP_SUPER_SUB_DISABLED_MATCH_ID;
   const superSubDisabled = boosterDisabled || superSubTempDisabled || superSubAlreadyUsedToday;
