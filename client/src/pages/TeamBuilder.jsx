@@ -927,6 +927,10 @@ export default function TeamBuilder() {
         focusStatus("Super Sub is temporarily disabled for this fixture.");
         return;
       }
+      if (superSubAlreadyUsedToday && superSubId) {
+        focusStatus("Super Sub already used for this match day. It cannot be changed for later fixtures on the same day.");
+        return;
+      }
       if (superSubId && (String(superSubId) === String(captainId) || String(superSubId) === String(viceCaptainId))) {
         focusStatus("Super Sub cannot be captain or vice-captain.");
         return;
@@ -1023,9 +1027,10 @@ export default function TeamBuilder() {
     const fixtureName = used.matchName || (used.team1 && used.team2 ? `${used.team1} vs ${used.team2}` : "this fixture");
     return { used: true, fixtureName, matchId: used.matchId };
   }, [submissionHistory, nextMatch?.date]);
+  const superSubAlreadyUsedToday = Boolean(superSubUsage?.used);
   const superSubTempDisabled = Boolean(TEMP_SUPER_SUB_DISABLED_MATCH_ID) &&
     String(nextMatch?.id || "") === TEMP_SUPER_SUB_DISABLED_MATCH_ID;
-  const superSubDisabled = boosterDisabled || superSubTempDisabled;
+  const superSubDisabled = boosterDisabled || superSubTempDisabled || superSubAlreadyUsedToday;
   const boosterLabel = (type) => {
     switch (type) {
       case "batsman":
@@ -1306,6 +1311,11 @@ export default function TeamBuilder() {
           ) : null}
           {superSubTempDisabled ? (
             <div className="notice">Super Sub is temporarily disabled for this fixture.</div>
+          ) : null}
+          {superSubAlreadyUsedToday ? (
+            <div className="notice">
+              Super Sub already used for this match day ({superSubUsage?.fixtureName || "earlier fixture"}). Super Sub field is disabled.
+            </div>
           ) : null}
           {teamMeta?.lockedInLeague ? (
             <div className="transfer-summary transfer-summary--team">
