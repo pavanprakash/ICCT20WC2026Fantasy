@@ -626,31 +626,14 @@ router.post("/", authRequired, async (req, res) => {
       .lean();
 
     if (priorSuperSubSubmission?.superSub) {
-      const carriedId = String(priorSuperSubSubmission.superSub);
-      if (superSub && String(superSub._id) !== carriedId) {
+      // Super Sub can be used only once per match day.
+      // For later fixtures on the same date, do not carry it forward and do not allow selecting one again.
+      if (superSub) {
         return res.status(400).json({
-          error: "Super Sub already used for this match day. Existing Super Sub will carry over to the next fixture."
+          error: "Super Sub already used for this match day. It cannot be selected again for later fixtures."
         });
       }
-      if (!superSub) {
-        superSub = await Player.findById(carriedId).lean();
-      }
-      if (!superSub) {
-        return res.status(400).json({
-          error: "Previously selected Super Sub is unavailable. Please re-select Super Sub for this match day."
-        });
-      }
-      const carriedSuperSubId = String(superSub._id);
-      if (uniqueIds.map(String).includes(carriedSuperSubId)) {
-        return res.status(400).json({
-          error: "Super Sub already used for this day and is carried forward. Remove that player from XI to submit."
-        });
-      }
-      if (String(captainId) === carriedSuperSubId || String(viceCaptainId) === carriedSuperSubId) {
-        return res.status(400).json({
-          error: "Super Sub already used for this day and is carried forward. It cannot be captain or vice-captain."
-        });
-      }
+      superSub = null;
     }
   }
 

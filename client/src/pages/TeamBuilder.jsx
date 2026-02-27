@@ -1215,6 +1215,12 @@ export default function TeamBuilder() {
   }, [teamMeta, isEditing]);
 
   useEffect(() => {
+    if (!superSubAlreadyUsedToday) return;
+    if (!superSubId) return;
+    setSuperSubId("");
+  }, [superSubAlreadyUsedToday, superSubId]);
+
+  useEffect(() => {
     if (isEditing) return;
     setBoosterSelected(null);
     setBoosterPlayerId(teamMeta?.boosterPlayer ? String(teamMeta.boosterPlayer) : "");
