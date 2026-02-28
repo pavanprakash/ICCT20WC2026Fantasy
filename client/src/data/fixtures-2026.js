@@ -63,7 +63,7 @@ const fixtures = [
   { date: "2026-02-26", time: "6:00 PM", timeGMT: "12:30", team1: "IND", team2: "ZIM", venue: "Chennai", stage: "Super 8" },
   { date: "2026-02-27", time: "6:00 PM", timeGMT: "12:30", team1: "ENG", team2: "NZ", venue: "Premadasa, Colombo", stage: "Super 8" },
   { date: "2026-02-28", time: "6:00 PM", timeGMT: "12:30", team1: "SL", team2: "PAK", venue: "Pallekele, Kandy", stage: "Super 8" },
-  { date: "2026-03-01", time: "2:30 PM", timeGMT: "09:00", team1: "ZIM", team2: "SA", venue: "Delhi", stage: "Super 8" },
+  { id: "ae421629-648d-4db0-8289-5f2b950c3982", date: "2026-03-01", time: "2:30 PM", timeGMT: "09:00", team1: "SL", team2: "PAK", venue: "Pallekele, Kandy", stage: "Super 8" },
   { date: "2026-03-01", time: "6:00 PM", timeGMT: "12:30", team1: "IND", team2: "WI", venue: "Kolkata", stage: "Super 8" },
 
   { date: "2026-03-04", time: "7:00 PM", timeGMT: "13:30", team1: "SF1", team2: "KO", venue: "Kolkata", stage: "Semi-Final" },

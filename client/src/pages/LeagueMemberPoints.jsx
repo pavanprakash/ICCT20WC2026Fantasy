@@ -69,11 +69,23 @@ const simpleFixture = (row) => {
   return first;
 };
 
+const rowSortTime = (row) => {
+  const startMs = Number(row?.matchStartMs || 0);
+  if (Number.isFinite(startMs) && startMs > 0) return startMs;
+  const dateKey = String(row?.matchDate || "").trim();
+  if (!dateKey) return 0;
+  const parsed = Date.parse(`${dateKey}T00:00:00Z`);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export default function LeagueMemberPoints() {
   const { id, userId } = useParams();
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState("loading");
   const [meta, setMeta] = useState({ userName: "", leagueName: "" });
+  const sortedRows = rows
+    .slice()
+    .sort((a, b) => rowSortTime(b) - rowSortTime(a));
 
   useEffect(() => {
     let mounted = true;
@@ -110,7 +122,7 @@ export default function LeagueMemberPoints() {
         <div className="notice">No submissions found yet.</div>
       )}
 
-      {rows.length > 0 && (
+      {sortedRows.length > 0 && (
         <div className="table table--points">
           <div className="table__row table__head">
             <span>Date</span>
@@ -119,7 +131,7 @@ export default function LeagueMemberPoints() {
             <span>Venue</span>
             <span>Points</span>
           </div>
-          {rows.map((row) => {
+          {sortedRows.map((row) => {
             const fixture = simpleFixture(row);
             const when = row.matchStartMs || row.matchDate;
             const clickable = canOpenPoints(row);
