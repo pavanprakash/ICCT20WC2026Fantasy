@@ -376,6 +376,15 @@ function getCurrentTransferState(nextMatchDate = null) {
   return phase;
 }
 
+function resolveSubmissionMeta(nextMatch, clientNextMatch = null) {
+  return {
+    matchName: nextMatch?.name || clientNextMatch?.name || null,
+    team1: nextMatch?.team1 || clientNextMatch?.team1 || null,
+    team2: nextMatch?.team2 || clientNextMatch?.team2 || null,
+    venue: nextMatch?.venue || clientNextMatch?.venue || null
+  };
+}
+
 router.get("/leaderboard", async (req, res) => {
   const teams = await Team.find()
     .populate("user", "name email")
@@ -640,6 +649,7 @@ router.post("/", authRequired, async (req, res) => {
   const member = await League.exists({ members: req.user.id });
 
   if (existing) {
+    const submissionMeta = resolveSubmissionMeta(window.nextMatch, clientNextMatch);
     const existingSubmissionForUpcoming = await TeamSubmission.findOne({
       user: req.user.id,
       matchId: window.nextMatch.id
@@ -752,10 +762,10 @@ router.post("/", authRequired, async (req, res) => {
         matchId: window.nextMatch.id,
         matchStartMs: window.nextMatch.startMs,
         matchDate: window.nextMatch.date || today,
-        matchName: clientNextMatch?.name || null,
-        team1: clientNextMatch?.team1 || null,
-        team2: clientNextMatch?.team2 || null,
-        venue: clientNextMatch?.venue || null,
+        matchName: submissionMeta.matchName,
+        team1: submissionMeta.team1,
+        team2: submissionMeta.team2,
+        venue: submissionMeta.venue,
         transferCost: transferCostForThisSubmission,
         players: uniqueIds,
         booster: boosterType,
@@ -792,6 +802,7 @@ router.post("/", authRequired, async (req, res) => {
   }
 
   const transferPhase = phase;
+  const submissionMeta = resolveSubmissionMeta(window.nextMatch, clientNextMatch);
   const team = await Team.create({
     name,
     user: req.user.id,
@@ -825,10 +836,10 @@ router.post("/", authRequired, async (req, res) => {
       matchId: window.nextMatch.id,
       matchStartMs: window.nextMatch.startMs,
       matchDate: window.nextMatch.date || today,
-      matchName: clientNextMatch?.name || null,
-      team1: clientNextMatch?.team1 || null,
-      team2: clientNextMatch?.team2 || null,
-      venue: clientNextMatch?.venue || null,
+      matchName: submissionMeta.matchName,
+      team1: submissionMeta.team1,
+      team2: submissionMeta.team2,
+      venue: submissionMeta.venue,
       transferCost: 0,
       players: uniqueIds,
       booster: boosterType,
