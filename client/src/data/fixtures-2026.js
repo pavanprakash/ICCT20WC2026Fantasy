@@ -66,11 +66,9 @@ const fixtures = [
   { id: "ae421629-648d-4db0-8289-5f2b950c3982", date: "2026-03-01", time: "2:30 PM", timeGMT: "09:00", team1: "SL", team2: "PAK", venue: "Pallekele, Kandy", stage: "Super 8" },
   { date: "2026-03-01", time: "6:00 PM", timeGMT: "12:30", team1: "IND", team2: "WI", venue: "Kolkata", stage: "Super 8" },
 
-  { date: "2026-03-04", time: "7:00 PM", timeGMT: "13:30", team1: "SF1", team2: "KO", venue: "Kolkata", stage: "Semi-Final" },
-  { date: "2026-03-04", time: "7:00 PM", timeGMT: "13:30", team1: "SF1", team2: "KO", venue: "Premadasa, Colombo", stage: "Semi-Final" },
-  { date: "2026-03-05", time: "7:00 PM", timeGMT: "13:30", team1: "SF2", team2: "KO", venue: "Mumbai", stage: "Semi-Final" },
-  { date: "2026-03-08", time: "7:00 PM", timeGMT: "13:30", team1: "FINAL", team2: "KO", venue: "Premadasa, Colombo", stage: "Final" },
-  { date: "2026-03-08", time: "7:00 PM", timeGMT: "13:30", team1: "FINAL", team2: "KO", venue: "Ahmedabad", stage: "Final" }
+  { date: "2026-03-04", time: "1:30 PM", timeGMT: "13:30", team1: "SA", team2: "NZ", venue: "Eden Gardens, Kolkata", stage: "Semi-Final" },
+  { date: "2026-03-05", time: "1:30 PM", timeGMT: "13:30", team1: "IND", team2: "ENG", venue: "Wankhede Stadium, Mumbai", stage: "Semi-Final" },
+  { date: "2026-03-08", time: "1:30 PM", timeGMT: "13:30", team1: "TBC", team2: "TBC", venue: "Narendra Modi Stadium, Ahmedabad", stage: "Final" }
 ];
 
 export default fixtures;

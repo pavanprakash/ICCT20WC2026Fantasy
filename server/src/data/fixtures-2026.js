@@ -66,11 +66,9 @@ const fixtures = [
   { date: "2026-03-01", stage: "Super 8" },
   { date: "2026-03-01", stage: "Super 8" },
 
-  { date: "2026-03-04", stage: "Semi-Final" },
-  { date: "2026-03-04", stage: "Semi-Final" },
-  { date: "2026-03-05", stage: "Semi-Final" },
-  { date: "2026-03-08", stage: "Final" },
-  { date: "2026-03-08", stage: "Final" }
+  { date: "2026-03-04", time: "1:30 PM", timeGMT: "13:30", team1: "SA", team2: "NZ", venue: "Eden Gardens, Kolkata", stage: "Semi-Final" },
+  { date: "2026-03-05", time: "1:30 PM", timeGMT: "13:30", team1: "IND", team2: "ENG", venue: "Wankhede Stadium, Mumbai", stage: "Semi-Final" },
+  { date: "2026-03-08", time: "1:30 PM", timeGMT: "13:30", team1: "TBC", team2: "TBC", venue: "Narendra Modi Stadium, Ahmedabad", stage: "Final" }
 ];
 
 export default fixtures;

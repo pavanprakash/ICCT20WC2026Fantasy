@@ -741,9 +741,9 @@ export default function TeamBuilder() {
   }, [teamMeta]);
 
   const transferPhaseLabel = useMemo(() => {
-    if (Date.now() < FIRST_PHASE2_START_MS) return "Pre-start";
+    if (Date.now() < FIRST_PHASE2_START_MS) return "Knockout Phase";
     if (!teamMeta?.transferPhase) return "Group";
-    if (teamMeta.transferPhase === "PHASE2_PRE") return "Pre-start";
+    if (teamMeta.transferPhase === "PHASE2_PRE") return "Knockout Phase";
     if (teamMeta.transferPhase === "PHASE2") return "Phase 2";
     return "Group";
   }, [teamMeta?.transferPhase]);
@@ -1343,7 +1343,7 @@ export default function TeamBuilder() {
               ) : (
                 <div>Transfers remaining: <strong>Unlimited</strong> (cap after start: 12)</div>
               )}
-              <div className="muted">Transfer phase: {transferPhaseLabel}</div>
+              <div className="muted">Transfer phase: {transferPhaseLabel === "Knockout Phase" ? <strong>{transferPhaseLabel}</strong> : transferPhaseLabel}</div>
               {showSuper8PreNotice ? (
                 <div className="muted">Unlimited transfers until the first fixture starts on 02-03-2026.</div>
               ) : null}

@@ -20,7 +20,8 @@
     "backfill:playing-xi": "node src/scripts/backfillPlayingXI.js",
     "audit:names": "node src/scripts/auditNameMismatches.js",
     "auto-submit:match": "node src/scripts/autoSubmitMatch.js",
-    "auto-submit:fix-match": "node src/scripts/fixAutoSubmissionsForMatch.js"
+    "auto-submit:fix-match": "node src/scripts/fixAutoSubmissionsForMatch.js",
+    "fixtures:capture-knockout-ids": "node src/scripts/captureKnockoutFixtureIds.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
