@@ -13,6 +13,7 @@ const TeamSchema = new mongoose.Schema(
     transfersByRound: { type: Map, of: Number, default: {} },
     transferPhase: { type: String, default: "GROUP" },
     postGroupResetDone: { type: Boolean, default: false },
+    postMarch02ResetDone: { type: Boolean, default: false },
     boosterUsed: { type: Boolean, default: false },
     boosterType: { type: String, default: null },
     usedBoosters: { type: [String], default: [] },

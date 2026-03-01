@@ -163,13 +163,13 @@ async function getBaselinePlayersBeforeFixture(userId, nextMatchId, nextMatchSta
 }
 
 const GROUP_LIMIT = 120;
-const SUPER8_LIMIT = 46;
+const PHASE2_LIMIT = 12;
 const TEAM_BUDGET_CAP = Number(process.env.TEAM_BUDGET_CAP || 100);
 const LOCK_BEFORE_SECONDS = 5;
 const LOCK_AFTER_MINUTES = 5;
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
-const FIRST_SUPER8_DATE = "2026-02-21";
-const FIRST_SUPER8_START_MS = Date.UTC(2026, 1, 21, 13, 30, 0, 0);
+const FIRST_PHASE2_DATE = "2026-03-02";
+const FIRST_PHASE2_START_MS = Date.UTC(2026, 2, 2, 0, 0, 0, 0);
 const ROLE_LIMITS = {
   bat: 5,
   bowl: 5,
@@ -368,11 +368,11 @@ function getTransferPhase() {
 function getCurrentTransferState(nextMatchDate = null) {
   const phase = getTransferPhase();
   const now = Date.now();
-  const inferredSuper8 = (nextMatchDate && String(nextMatchDate) >= FIRST_SUPER8_DATE) || phase === "SUPER8";
-  if (inferredSuper8 && now < FIRST_SUPER8_START_MS) {
-    return "SUPER8_PRE";
+  const inferredPhase2 = (nextMatchDate && String(nextMatchDate) >= FIRST_PHASE2_DATE) || phase === "SUPER8";
+  if (inferredPhase2 && now < FIRST_PHASE2_START_MS) {
+    return "PHASE2_PRE";
   }
-  if (inferredSuper8) return "SUPER8";
+  if (inferredPhase2) return "PHASE2";
   return phase;
 }
 
@@ -410,26 +410,27 @@ router.get("/me", authRequired, async (req, res) => {
   if (!team) return res.json(null);
 
   const phase =
-    team.transferPhase === "SUPER8_PRE" && Date.now() < FIRST_SUPER8_START_MS
-      ? "SUPER8_PRE"
+    team.transferPhase === "PHASE2_PRE" && Date.now() < FIRST_PHASE2_START_MS
+      ? "PHASE2_PRE"
       : getCurrentTransferState(team.submittedForDate || null);
-  const needsSuper8Reset =
-    (phase === "SUPER8_PRE" || phase === "SUPER8") &&
-    !team.postGroupResetDone;
+  const needsPhase2Reset =
+    (phase === "PHASE2_PRE" || phase === "PHASE2") &&
+    !team.postMarch02ResetDone;
 
-  let transfersLimit = team.transfersLimit ?? (phase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT);
+  let transfersLimit = team.transfersLimit ?? (phase === "GROUP" ? GROUP_LIMIT : PHASE2_LIMIT);
   let transfersUsedTotal = team.transfersUsedTotal ?? 0;
   let transfersByRound = team.transfersByRound || {};
   let transferPhase = phase;
   let postGroupResetDone = team.postGroupResetDone || false;
+  let postMarch02ResetDone = team.postMarch02ResetDone || false;
 
-  // Backfill existing users lazily when they load team data in Super 8 window.
-  if (needsSuper8Reset) {
-    transfersLimit = SUPER8_LIMIT;
+  // Backfill existing users lazily when they load team data in this phase window.
+  if (needsPhase2Reset) {
+    transfersLimit = PHASE2_LIMIT;
     transfersUsedTotal = 0;
     transfersByRound = {};
     transferPhase = phase;
-    postGroupResetDone = true;
+    postMarch02ResetDone = true;
     await Team.updateOne(
       { _id: team._id },
       {
@@ -438,7 +439,7 @@ router.get("/me", authRequired, async (req, res) => {
           transfersUsedTotal,
           transfersByRound,
           transferPhase,
-          postGroupResetDone
+          postMarch02ResetDone
         }
       }
     );
@@ -455,6 +456,7 @@ router.get("/me", authRequired, async (req, res) => {
     transfersByRound,
     transferPhase,
     postGroupResetDone,
+    postMarch02ResetDone,
     boosterUsed: team.boosterUsed || false,
     boosterType: team.boosterType || null,
     usedBoosters: team.usedBoosters || [],
@@ -665,65 +667,63 @@ router.post("/", authRequired, async (req, res) => {
     if (boosterType && usedBoosters.includes(boosterType)) {
       return res.status(400).json({ error: "Booster already used for this tournament." });
     }
-    if (existing.lockedInLeague) {
-      if (inFirstSubmissionWindow) {
-        // Free changes before the first submitted match starts; no transfers counted.
-        transferCostForThisSubmission = 0;
-      } else if (phase === "SUPER8_PRE") {
-        // Unlimited transfers before first Super 8 fixture starts.
-        if (!existing.postGroupResetDone) {
-          existing.transfersUsedTotal = 0;
-          existing.transfersByRound = {};
-          existing.postGroupResetDone = true;
-        }
-        existing.transfersLimit = SUPER8_LIMIT;
-        existing.transferPhase = "SUPER8_PRE";
-        transferCostForThisSubmission = 0;
-      } else {
-        if (phase === "SUPER8" && !existing.postGroupResetDone) {
-          existing.transfersUsedTotal = 0;
-          existing.transfersByRound = {};
-          existing.postGroupResetDone = true;
-        }
-        const limit = phase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT;
-        existing.transfersLimit = limit;
-        existing.transferPhase = phase;
-        const sameUpcomingFixture =
-          Boolean(existing.submittedForMatchId) && String(existing.submittedForMatchId) === String(window.nextMatch.id);
-        const previousCost = Number(existingSubmissionForUpcoming?.transferCost || 0);
-        let transfersDelta = 0;
-        if (sameUpcomingFixture) {
-          const baselinePlayers = await getBaselinePlayersBeforeFixture(
-            req.user.id,
-            window.nextMatch.id,
-            Number(window.nextMatch.startMs),
-            existing.players || []
-          );
-          transferCostForThisSubmission = diffTransfers(baselinePlayers || [], uniqueIds);
-          transfersDelta = transferCostForThisSubmission - previousCost;
-        } else {
-          const transfersThisAction = diffTransfers(existing.players || [], uniqueIds);
-          transferCostForThisSubmission = transfersThisAction;
-          transfersDelta = transfersThisAction;
-        }
-        const used = existing.transfersUsedTotal ?? 0;
-        if (used + transfersDelta > limit) {
-          return res.status(400).json({
-            error: "You have maxed out the number of allowed transfers for this round!"
-          });
-        }
-        const key = roundKey();
-        const byRound = existing.transfersByRound || {};
-        const current = Number(byRound.get ? byRound.get(key) : byRound[key] || 0) || 0;
-        const nextRoundValue = clampNonNegative(current + transfersDelta);
-        if (byRound.set) {
-          byRound.set(key, nextRoundValue);
-        } else {
-          byRound[key] = nextRoundValue;
-        }
-        existing.transfersByRound = byRound;
-        existing.transfersUsedTotal = clampNonNegative(used + transfersDelta);
+    if (inFirstSubmissionWindow) {
+      // Free changes before the first submitted match starts; no transfers counted.
+      transferCostForThisSubmission = 0;
+    } else if (phase === "PHASE2_PRE") {
+      // Unlimited transfers before first fixture on 2026-03-02 starts.
+      if (!existing.postMarch02ResetDone) {
+        existing.transfersUsedTotal = 0;
+        existing.transfersByRound = {};
+        existing.postMarch02ResetDone = true;
       }
+      existing.transfersLimit = PHASE2_LIMIT;
+      existing.transferPhase = "PHASE2_PRE";
+      transferCostForThisSubmission = 0;
+    } else {
+      if (phase === "PHASE2" && !existing.postMarch02ResetDone) {
+        existing.transfersUsedTotal = 0;
+        existing.transfersByRound = {};
+        existing.postMarch02ResetDone = true;
+      }
+      const limit = phase === "GROUP" ? GROUP_LIMIT : PHASE2_LIMIT;
+      existing.transfersLimit = limit;
+      existing.transferPhase = phase;
+      const sameUpcomingFixture =
+        Boolean(existing.submittedForMatchId) && String(existing.submittedForMatchId) === String(window.nextMatch.id);
+      const previousCost = Number(existingSubmissionForUpcoming?.transferCost || 0);
+      let transfersDelta = 0;
+      if (sameUpcomingFixture) {
+        const baselinePlayers = await getBaselinePlayersBeforeFixture(
+          req.user.id,
+          window.nextMatch.id,
+          Number(window.nextMatch.startMs),
+          existing.players || []
+        );
+        transferCostForThisSubmission = diffTransfers(baselinePlayers || [], uniqueIds);
+        transfersDelta = transferCostForThisSubmission - previousCost;
+      } else {
+        const transfersThisAction = diffTransfers(existing.players || [], uniqueIds);
+        transferCostForThisSubmission = transfersThisAction;
+        transfersDelta = transfersThisAction;
+      }
+      const used = existing.transfersUsedTotal ?? 0;
+      if (used + transfersDelta > limit) {
+        return res.status(400).json({
+          error: "You have maxed out the number of allowed transfers for this round!"
+        });
+      }
+      const key = roundKey();
+      const byRound = existing.transfersByRound || {};
+      const current = Number(byRound.get ? byRound.get(key) : byRound[key] || 0) || 0;
+      const nextRoundValue = clampNonNegative(current + transfersDelta);
+      if (byRound.set) {
+        byRound.set(key, nextRoundValue);
+      } else {
+        byRound[key] = nextRoundValue;
+      }
+      existing.transfersByRound = byRound;
+      existing.transfersUsedTotal = clampNonNegative(used + transfersDelta);
     }
 
     const priorSubmittedStart = existing.submittedForMatchStart
@@ -780,12 +780,13 @@ router.post("/", authRequired, async (req, res) => {
     return res.json({
       id: existing._id,
       name: existing.name,
-      transfersLimit: existing.transfersLimit ?? (phase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT),
+      transfersLimit: existing.transfersLimit ?? (phase === "GROUP" ? GROUP_LIMIT : PHASE2_LIMIT),
       transfersUsedTotal: existing.transfersUsedTotal ?? 0,
       lockedInLeague: existing.lockedInLeague || false,
       transfersByRound: existing.transfersByRound || {},
       transferPhase: existing.transferPhase || phase,
       postGroupResetDone: existing.postGroupResetDone || false,
+      postMarch02ResetDone: existing.postMarch02ResetDone || false,
       boosterUsed: existing.boosterUsed || false,
       boosterType: existing.boosterType || null,
       usedBoosters: existing.usedBoosters || [],
@@ -810,11 +811,12 @@ router.post("/", authRequired, async (req, res) => {
     captain: captainId,
     viceCaptain: viceCaptainId,
     lockedInLeague: Boolean(member),
-    transfersLimit: transferPhase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT,
+    transfersLimit: transferPhase === "GROUP" ? GROUP_LIMIT : PHASE2_LIMIT,
     transfersUsedTotal: 0,
     transfersByRound: {},
     transferPhase,
-    postGroupResetDone: transferPhase === "SUPER8" || transferPhase === "SUPER8_PRE",
+    postGroupResetDone: false,
+    postMarch02ResetDone: transferPhase === "PHASE2" || transferPhase === "PHASE2_PRE",
     boosterUsed: Boolean(boosterType),
     boosterType: boosterType || null,
     usedBoosters: boosterType ? [boosterType] : [],
@@ -853,12 +855,13 @@ router.post("/", authRequired, async (req, res) => {
   res.json({
     id: team._id,
     name: team.name,
-    transfersLimit: team.transfersLimit ?? (transferPhase === "GROUP" ? GROUP_LIMIT : SUPER8_LIMIT),
+    transfersLimit: team.transfersLimit ?? (transferPhase === "GROUP" ? GROUP_LIMIT : PHASE2_LIMIT),
     transfersUsedTotal: team.transfersUsedTotal ?? 0,
     lockedInLeague: team.lockedInLeague || false,
     transfersByRound: team.transfersByRound || {},
     transferPhase: team.transferPhase || transferPhase,
     postGroupResetDone: team.postGroupResetDone || false,
+    postMarch02ResetDone: team.postMarch02ResetDone || false,
     boosterUsed: team.boosterUsed || false,
     boosterType: team.boosterType || null,
     usedBoosters: team.usedBoosters || [],

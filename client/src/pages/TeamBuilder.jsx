@@ -29,7 +29,7 @@ const MATCH_DURATION_MS = 4 * 60 * 60 * 1000;
 const SYNC_WINDOW_MS = 10 * 60 * 1000;
 const LOCK_BEFORE_MS = 5 * 1000;
 const LOCK_AFTER_MS = 5 * 60 * 1000;
-const FIRST_SUPER8_START_MS = Date.UTC(2026, 1, 21, 13, 30, 0, 0);
+const FIRST_PHASE2_START_MS = Date.UTC(2026, 2, 2, 0, 0, 0, 0);
 const TEMP_SUPER_SUB_DISABLED_MATCH_ID = String(import.meta.env.VITE_SUPER_SUB_DISABLED_MATCH_ID || "").trim();
 const TEAM_NAME_MAP = {
   AFG: "Afghanistan",
@@ -370,7 +370,7 @@ export default function TeamBuilder() {
           : (t.data.boosterUsed && t.data.boosterType ? [t.data.boosterType] : []);
         setTeamMeta({
           lockedInLeague: t.data.lockedInLeague || false,
-          transfersLimit: t.data.transfersLimit ?? 120,
+          transfersLimit: t.data.transfersLimit ?? 12,
           transfersUsedTotal: t.data.transfersUsedTotal ?? 0,
           transfersByRound: t.data.transfersByRound || {},
           submittedAt: t.data.submittedAt || null,
@@ -712,7 +712,7 @@ export default function TeamBuilder() {
   const totalPoints = periodPoints.total;
 
   const transfersUsedThisRound = useMemo(() => {
-    if (Date.now() < FIRST_SUPER8_START_MS) return 0;
+    if (Date.now() < FIRST_PHASE2_START_MS) return 0;
     if (!teamMeta) return 0;
     const key = roundKey();
     const map = teamMeta.transfersByRound || {};
@@ -723,15 +723,15 @@ export default function TeamBuilder() {
   }, [teamMeta]);
 
   const transfersRemaining = useMemo(() => {
-    if (Date.now() < FIRST_SUPER8_START_MS) return null;
+    if (Date.now() < FIRST_PHASE2_START_MS) return null;
     if (!teamMeta) return null;
-    const limit = teamMeta.transfersLimit ?? 120;
+    const limit = teamMeta.transfersLimit ?? 12;
     const used = teamMeta.transfersUsedTotal ?? 0;
     return Math.max(0, limit - used);
   }, [teamMeta]);
 
   const transfersByRoundList = useMemo(() => {
-    if (Date.now() < FIRST_SUPER8_START_MS) return [];
+    if (Date.now() < FIRST_PHASE2_START_MS) return [];
     if (!teamMeta?.transfersByRound) return [];
     const map = teamMeta.transfersByRound;
     const entries = map instanceof Map ? Array.from(map.entries()) : Object.entries(map);
@@ -741,15 +741,15 @@ export default function TeamBuilder() {
   }, [teamMeta]);
 
   const transferPhaseLabel = useMemo(() => {
-    if (Date.now() < FIRST_SUPER8_START_MS) return "Super 8 (Pre-start)";
+    if (Date.now() < FIRST_PHASE2_START_MS) return "Pre-start";
     if (!teamMeta?.transferPhase) return "Group";
-    if (teamMeta.transferPhase === "SUPER8_PRE") return "Super 8 (Pre-start)";
-    if (teamMeta.transferPhase === "SUPER8") return "Super 8";
+    if (teamMeta.transferPhase === "PHASE2_PRE") return "Pre-start";
+    if (teamMeta.transferPhase === "PHASE2") return "Phase 2";
     return "Group";
   }, [teamMeta?.transferPhase]);
 
   const showSuper8PreNotice = useMemo(() => {
-    return Date.now() < FIRST_SUPER8_START_MS;
+    return Date.now() < FIRST_PHASE2_START_MS;
   }, [teamMeta]);
 
   const teamCounts = useMemo(() => {
@@ -960,7 +960,7 @@ export default function TeamBuilder() {
         const nextSuperSubId = res.data.superSub ? String(res.data.superSub) : "";
         setTeamMeta((prev) => ({
           lockedInLeague: res.data.lockedInLeague ?? prev?.lockedInLeague ?? false,
-          transfersLimit: res.data.transfersLimit ?? prev?.transfersLimit ?? 120,
+          transfersLimit: res.data.transfersLimit ?? prev?.transfersLimit ?? 12,
           transfersUsedTotal: res.data.transfersUsedTotal ?? prev?.transfersUsedTotal ?? 0,
           transfersByRound: res.data.transfersByRound ?? prev?.transfersByRound ?? {},
           transferPhase: res.data.transferPhase ?? prev?.transferPhase ?? "GROUP",
@@ -1322,7 +1322,7 @@ export default function TeamBuilder() {
             <div className="notice">You have already submitted your team for the upcoming match.</div>
           ) : null}
           {showSuper8PreNotice ? (
-            <div className="notice">You are allowed to make unlimited transfers before the start of first Super 8 fixture.</div>
+            <div className="notice">You are allowed to make unlimited transfers.</div>
           ) : null}
           {superSubTempDisabled ? (
             <div className="notice">Super Sub is temporarily disabled for this fixture.</div>
@@ -1332,20 +1332,20 @@ export default function TeamBuilder() {
               Super Sub already used for this match day ({superSubUsage?.fixtureName || "earlier fixture"}). Super Sub field is disabled.
             </div>
           ) : null}
-          {teamMeta?.lockedInLeague ? (
+          {teamMeta ? (
             <div className="transfer-summary transfer-summary--team">
               <div>Transfers this round: <strong>{showSuper8PreNotice ? "Unlimited" : transfersUsedThisRound}</strong></div>
               {!showSuper8PreNotice ? (
                 <div>Transfers used: <strong>{teamMeta.transfersUsedTotal ?? 0}</strong></div>
               ) : null}
               {!showSuper8PreNotice ? (
-                <div>Transfers remaining: <strong>{transfersRemaining ?? 0}</strong> / {teamMeta.transfersLimit ?? 120}</div>
+                <div>Transfers remaining: <strong>{transfersRemaining ?? 0}</strong> / {teamMeta.transfersLimit ?? 12}</div>
               ) : (
-                <div>Transfers remaining: <strong>Unlimited</strong> (Super 8 cap after start: 46)</div>
+                <div>Transfers remaining: <strong>Unlimited</strong> (cap after start: 12)</div>
               )}
               <div className="muted">Transfer phase: {transferPhaseLabel}</div>
               {showSuper8PreNotice ? (
-                <div className="muted">Unlimited transfers until the first Super 8 fixture starts.</div>
+                <div className="muted">Unlimited transfers until the first fixture starts on 02-03-2026.</div>
               ) : null}
               {!showSuper8PreNotice ? (
                 <div className="transfer-rounds">
@@ -1366,7 +1366,7 @@ export default function TeamBuilder() {
               ) : null}
             </div>
           ) : (
-            <div className="transfer-summary muted">Unlimited transfers until you submit a team into a league.</div>
+            <div className="transfer-summary muted">Create your team to start tracking transfers.</div>
           )}
           {!teamMeta?.submittedForMatchId && (
             <button className="btn btn--primary" type="button" onClick={autoPopulateTeam}>
