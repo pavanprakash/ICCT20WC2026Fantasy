@@ -29,7 +29,7 @@ const MATCH_DURATION_MS = 4 * 60 * 60 * 1000;
 const SYNC_WINDOW_MS = 10 * 60 * 1000;
 const LOCK_BEFORE_MS = 5 * 1000;
 const LOCK_AFTER_MS = 5 * 60 * 1000;
-const FIRST_PHASE2_START_MS = Date.UTC(2026, 2, 2, 0, 0, 0, 0);
+const FIRST_PHASE2_START_MS = Date.UTC(2026, 2, 2, 13, 30, 0, 0);
 const TEMP_SUPER_SUB_DISABLED_MATCH_ID = String(import.meta.env.VITE_SUPER_SUB_DISABLED_MATCH_ID || "").trim();
 const TEAM_NAME_MAP = {
   AFG: "Afghanistan",
@@ -745,10 +745,10 @@ export default function TeamBuilder() {
 
   const transferPhaseLabel = useMemo(() => {
     if (Date.now() < FIRST_PHASE2_START_MS) return "Knockout Phase";
-    if (!teamMeta?.transferPhase) return "Group";
+    if (!teamMeta?.transferPhase) return "Knockout Phase";
     if (teamMeta.transferPhase === "PHASE2_PRE") return "Knockout Phase";
-    if (teamMeta.transferPhase === "PHASE2") return "Phase 2";
-    return "Group";
+    if (teamMeta.transferPhase === "PHASE2") return "Knockout Phase";
+    return "Knockout Phase";
   }, [teamMeta?.transferPhase]);
 
   const showSuper8PreNotice = useMemo(() => {
@@ -1438,7 +1438,7 @@ export default function TeamBuilder() {
                   </option>
                 ))}
               </select>
-              <div className="muted">Replaces the first non-playing XI member for this fixture.</div>
+              <div className="muted">Replaces the team member with lowest points accumulated.</div>
             </div>
           </div>
           <div className="panel-block panel-block--fixtures">
@@ -1460,23 +1460,20 @@ export default function TeamBuilder() {
             <div className="fixture-columns">
               {fixtureDateWindow.map((dateKey) => {
                 const rows = fixturesByWindowDate.get(dateKey) || [];
+                if (!rows.length) return null;
                 return (
                   <div className="fixture-column" key={dateKey}>
                     <div className="fixture-column__header">{dateKey}</div>
-                    {rows.length ? (
-                      <div className="fixture-mini">
-                        {rows.map((match, idx) => (
-                          <div key={match.id || `${dateKey}-${idx}`} className="fixture-mini__item">
-                            <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
-                            <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
-                            <div className="muted">{match.venue}</div>
-                            <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="muted">No fixtures for {dateKey}.</div>
-                    )}
+                    <div className="fixture-mini">
+                      {rows.map((match, idx) => (
+                        <div key={match.id || `${dateKey}-${idx}`} className="fixture-mini__item">
+                          <div className="fixture-mini__time">GMT {match.timeGMT || match.time}</div>
+                          <div className="fixture-mini__teams">{match.team1} vs {match.team2}</div>
+                          <div className="muted">{match.venue}</div>
+                          <div className="muted">{match.statusLabel || match.status || "Scheduled"}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
               })}

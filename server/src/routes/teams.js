@@ -169,7 +169,7 @@ const LOCK_BEFORE_SECONDS = 5;
 const LOCK_AFTER_MINUTES = 5;
 const SERIES_ID = process.env.CRICAPI_SERIES_ID || "0cdf6736-ad9b-4e95-a647-5ee3a99c5510";
 const FIRST_PHASE2_DATE = "2026-03-02";
-const FIRST_PHASE2_START_MS = Date.UTC(2026, 2, 2, 0, 0, 0, 0);
+const FIRST_PHASE2_START_MS = Date.UTC(2026, 2, 2, 13, 30, 0, 0);
 const ROLE_LIMITS = {
   bat: 5,
   bowl: 5,
