@@ -29,7 +29,7 @@ const MATCH_DURATION_MS = 4 * 60 * 60 * 1000;
 const SYNC_WINDOW_MS = 10 * 60 * 1000;
 const LOCK_BEFORE_MS = 5 * 1000;
 const LOCK_AFTER_MS = 5 * 60 * 1000;
-const FIRST_PHASE2_START_MS = Date.UTC(2026, 2, 2, 13, 30, 0, 0);
+const FIRST_PHASE2_START_MS = Date.UTC(2026, 2, 4, 13, 30, 0, 0);
 const TEMP_SUPER_SUB_DISABLED_MATCH_ID = String(import.meta.env.VITE_SUPER_SUB_DISABLED_MATCH_ID || "").trim();
 const TEAM_NAME_MAP = {
   AFG: "Afghanistan",
@@ -1348,7 +1348,7 @@ export default function TeamBuilder() {
               )}
               <div className="muted">Transfer phase: {transferPhaseLabel === "Knockout Phase" ? <strong>{transferPhaseLabel}</strong> : transferPhaseLabel}</div>
               {showSuper8PreNotice ? (
-                <div className="muted">Unlimited transfers until the first fixture starts on 02-03-2026.</div>
+                <div className="muted">Unlimited transfers until SA v NZ starts on 04-03-2026 at 13:30 GMT.</div>
               ) : null}
               {!showSuper8PreNotice ? (
                 <div className="transfer-rounds">
