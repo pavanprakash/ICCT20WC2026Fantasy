@@ -4,6 +4,7 @@ import Player from "../models/Player.js";
 import { cricapiGet, cricapiGetScorecardSafe } from "./cricapi.js";
 import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "./fantasyScoring.js";
 import { getPlayingSubstitutes, getPlayingXI } from "./playingXI.js";
+import { applyPointOverrides } from "./pointOverrides.js";
 import { normalizeNameKey } from "../utils/nameCanonical.js";
 
 function normalizeName(value) {
@@ -68,13 +69,14 @@ export async function syncMatchPoints(matchId, { scorecardKey } = {}) {
   const playingSubstituteBonus = Number(
     rules?.additional?.playingSubstitute ?? DEFAULT_RULESET.additional.playingSubstitute
   );
-  const points = applyPlayingXIPoints(
+  let points = applyPlayingXIPoints(
     calculateMatchPoints(scorecard, rules, { playerRoleByName: roleByName }),
     playingXI,
     playingXIBonus,
     playingSubstitutes,
     playingSubstituteBonus
   );
+  points = await applyPointOverrides(points, { matchId, ruleset: rules.name });
   if (!points.length) {
     throw new Error("No points computed from scorecard.");
   }

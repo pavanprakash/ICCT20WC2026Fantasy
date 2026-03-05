@@ -6,6 +6,7 @@ import Player from "../models/Player.js";
 import { cricapiGet, cricapiGetScorecardSafe } from "../services/cricapi.js";
 import { applyPlayingXIPoints, calculateMatchPoints, DEFAULT_RULESET } from "../services/fantasyScoring.js";
 import { getPlayingSubstitutes, getPlayingXI } from "../services/playingXI.js";
+import { applyPointOverrides } from "../services/pointOverrides.js";
 import { normalizeNameKey } from "../utils/nameCanonical.js";
 
 dotenv.config();
@@ -196,13 +197,14 @@ async function run() {
     const playingSubstituteBonus = Number(
       rules?.additional?.playingSubstitute ?? DEFAULT_RULESET.additional.playingSubstitute
     );
-    const points = applyPlayingXIPoints(
+    let points = applyPlayingXIPoints(
       calculateMatchPoints(scorecard, rules, { playerRoleByName: roleByName }),
       playingXI,
       playingXIBonus,
       playingSubstitutes,
       playingSubstituteBonus
     );
+    points = await applyPointOverrides(points, { matchId, ruleset: rules.name });
     if (!points.length) {
       if (debug) {
         const topLevelKeys = safe.data && typeof safe.data === "object" ? Object.keys(safe.data).slice(0, 20) : [];
