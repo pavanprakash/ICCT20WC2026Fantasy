@@ -14,7 +14,8 @@ const NAME_ALIASES = {
   "joshua little": "josh little",
   "abdullah ahmadzai": "abdollah ahmadzai",
   "mohammed siraj": "mohammad siraj",
-  "mohsin": "mohammad mohsin"
+  "mohsin": "mohammad mohsin",
+  "glenn philips": "glenn phillips"
 };
 
 export function normalizeNameKey(value) {
